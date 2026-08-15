@@ -1,11 +1,11 @@
 {
-  "name": "8bit",
+  "name": "8-bit",
   "version": "1.0.0",
   "description": "8-Bit Satoshi — Bitcoin platformer for the terminal",
-  "private": true,
   "type": "module",
+  "repository": "github:salmanrrana/8-bit",
   "bin": {
-    "8bit": "./bin/8bit.js"
+    "8-bit": "./bin/8bit.js"
   },
   "scripts": {
     "start": "node ./bin/8bit.js",
