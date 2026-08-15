@@ -4,6 +4,9 @@
   "description": "8-Bit Satoshi — Bitcoin platformer for the terminal",
   "type": "module",
   "repository": "github:salmanrrana/8-bit",
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/"
+  },
   "bin": {
     "8-bit": "./bin/8bit.js"
   },
