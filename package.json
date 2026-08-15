@@ -1,0 +1,22 @@
+{
+  "name": "8bit",
+  "version": "1.0.0",
+  "description": "8-Bit Satoshi — Bitcoin platformer for the terminal",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "8bit": "./bin/8bit.js"
+  },
+  "scripts": {
+    "start": "node ./bin/8bit.js",
+    "test": "node --test src/game.test.ts"
+  },
+  "engines": {
+    "node": ">=22.6"
+  },
+  "files": [
+    "bin",
+    "src"
+  ],
+  "license": "MIT"
+}
