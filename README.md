@@ -6,7 +6,7 @@ graphics. Four levels, three lives, checkpoints.
 ## Play
 
 ```bash
-npx 8-bit
+npx eight-bit
 ```
 
 Needs Node.js 22.6+ and a real TTY. Looks best in a truecolor terminal

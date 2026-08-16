@@ -1,5 +1,5 @@
 {
-  "name": "8-bit",
+  "name": "eight-bit",
   "version": "1.0.0",
   "description": "A retro platformer for the terminal with truecolor pixel graphics",
   "type": "module",
@@ -11,7 +11,7 @@
     "registry": "https://registry.npmjs.org/"
   },
   "bin": {
-    "8-bit": "bin/8bit.js"
+    "eight-bit": "bin/8bit.js"
   },
   "scripts": {
     "start": "node ./bin/8bit.js",
