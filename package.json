@@ -3,12 +3,15 @@
   "version": "1.0.0",
   "description": "A retro platformer for the terminal with truecolor pixel graphics",
   "type": "module",
-  "repository": "github:salmanrrana/8-bit",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/salmanrrana/8-bit.git"
+  },
   "publishConfig": {
     "registry": "https://registry.npmjs.org/"
   },
   "bin": {
-    "8-bit": "./bin/8bit.js"
+    "8-bit": "bin/8bit.js"
   },
   "scripts": {
     "start": "node ./bin/8bit.js",
