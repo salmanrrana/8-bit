@@ -107,6 +107,7 @@ export type SideLevel = {
   title: string;
   description: string;
   theme: Theme;
+  mode?: "side";
   worldW: number;
   goal: Box;
   labels?: Labels;

@@ -1,6 +1,6 @@
 {
   "name": "eightbit",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A retro platformer for the terminal with truecolor pixel graphics",
   "type": "module",
   "repository": {
@@ -15,14 +15,20 @@
   },
   "scripts": {
     "start": "node ./bin/8bit.js",
+    "build": "tsc -p tsconfig.build.json",
+    "prepublishOnly": "npm test && npm run build",
     "test": "node --test src/game.test.ts"
   },
   "engines": {
-    "node": ">=22.6"
+    "node": ">=18"
   },
   "files": [
     "bin",
-    "src"
+    "dist"
   ],
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "typescript": "^7.0.2"
+  }
 }

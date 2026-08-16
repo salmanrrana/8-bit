@@ -9,7 +9,7 @@ graphics. Four levels, three lives, checkpoints.
 npx eightbit
 ```
 
-Needs Node.js 22.6+ and a real TTY. Looks best in a truecolor terminal
+Needs Node.js 18+ and a real TTY. Looks best in a truecolor terminal
 (Ghostty, Kitty, iTerm, WezTerm, Windows Terminal).
 
 ## Controls

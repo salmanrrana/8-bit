@@ -389,7 +389,7 @@ export class Game {
     this.clearSide();
     const layout = level.layout;
     for (const [x, w] of layout.ground) this.addGround(x, w);
-    for (const plat of layout.platforms) this.addPlatform(...plat);
+    for (const [x, y, w, h, kind, cycle] of layout.platforms) this.addPlatform(x, y, w, h, kind, cycle);
     for (const [x, count] of layout.blockStacks ?? []) this.addBlockStack(x, count);
     for (const [x, y, count] of layout.coinArcs) this.addCoinArc(x, y, count);
     for (const [x, y] of layout.pages) this.addPage(x, y);
@@ -513,7 +513,7 @@ export class Game {
 
     const layout = venue.layout;
     for (const [x, w] of layout.ground) this.addGround(x, w);
-    for (const plat of layout.platforms ?? []) this.addPlatform(...plat);
+    for (const [x, y, w, h, kind, cycle] of layout.platforms ?? []) this.addPlatform(x, y, w, h, kind, cycle);
     for (const [x, count] of layout.barricades ?? []) this.addBarricade(x, count);
     for (const [x, y, count] of layout.coinArcs ?? []) this.addCoinArc(x, y, count);
     if (!this.stashesTaken.includes(key)) {
