@@ -1,7 +1,7 @@
 # 8-bit
 
 A retro platformer that runs in your terminal, with truecolor pixel
-graphics. Four levels, three lives, checkpoints.
+graphics. Five levels, three lives, checkpoints.
 
 ## Play
 
@@ -24,5 +24,5 @@ Needs Node.js 18+ and a real TTY. Looks best in a truecolor terminal
 | Esc / P | Pause |
 | R | Restart |
 | M | Level select |
-| 1–4 | Jump to that level |
+| 1–5 | Jump to that level |
 | Q | Quit (title) or pause (in-run) |

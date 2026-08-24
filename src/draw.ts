@@ -1,6 +1,7 @@
-import { TILE, VIEW_H, type Game, type Solid } from "./game.ts";
+import { TILE, VIEW_H, type Game, type Solid, type Taxi } from "./game.ts";
 import { Fb, hash2, lerpC } from "./fb.ts";
 import {
+  BULL,
   DEFAULT_NPC_PAL,
   drawTiny,
   ENEMY_SKINS,
@@ -196,19 +197,33 @@ function coinAt(v: View, wx: number, wy: number, r: number, time: number): void 
 
 // --- Side-scroller ----------------------------------------------------------
 
+/** True inside an overworld venue: no sky, just the room's back wall. */
+function isInterior(game: Game): boolean {
+  const level = game.currentLevel();
+  return game.subMode === "venue" && level.mode === "overworld";
+}
+
+/** Venues with the dressed-up "16-bit" pass: marble floors, bevels, wall TVs. */
+function hasDressedInteriors(game: Game): boolean {
+  const level = game.currentLevel();
+  return level.mode === "overworld" && (level.theme === "mania" || level.theme === "wallstreet");
+}
+
 function drawSide(game: Game, scale: Scale, sky: number, sky2: number, ground: number, accent: number): void {
   const s = scale.unit;
   const visH = scale.pixH * s;
   const v: View = { s, camX: game.cameraX, camY: VIEW_H - visH };
   const dark = luminance(sky) < 64;
 
-  for (let py = 0; py < fb.h; py += 1) {
-    const wy = v.camY + py * s;
-    const t = clamp(wy / VIEW_H, 0, 1);
-    fb.px.fill(lerpC(sky, sky2, t), py * fb.w, (py + 1) * fb.w);
+  if (isInterior(game)) drawInteriorWalls(v, packHex(game.activeZone().ground), game);
+  else {
+    for (let py = 0; py < fb.h; py += 1) {
+      const wy = v.camY + py * s;
+      const t = clamp(wy / VIEW_H, 0, 1);
+      fb.px.fill(lerpC(sky, sky2, t), py * fb.w, (py + 1) * fb.w);
+    }
+    drawBackdrop(v, sky, sky2, ground, dark);
   }
-
-  drawBackdrop(v, sky, sky2, ground, dark);
 
   for (const solid of game.solids) drawSolid(game, v, solid, sky2, ground, accent);
 
@@ -230,7 +245,8 @@ function drawSide(game: Game, scale: Scale, sky: number, sky2: number, ground: n
   for (const page of game.pagesList) {
     if (page.taken) continue;
     const bob = Math.sin(game.time * 3 + page.x * 0.05) * 2;
-    spriteBox(v, PAGE, PAGE_PAL, page.x, page.y + bob, page.w, page.h);
+    if (game.levelLabel("pageNote", "Page") === "Key") drawKey(v, page.x, page.y + bob, page.w, page.h, game.time);
+    else spriteBox(v, PAGE, PAGE_PAL, page.x, page.y + bob, page.w, page.h);
   }
 
   for (const cp of game.checkpoints) drawCheckpoint(v, cp.x, cp.y, cp.taken, game.time);
@@ -337,10 +353,102 @@ function drawBackdrop(v: View, sky: number, sky2: number, ground: number, dark: 
   }
 }
 
+/** Venue back wall: beveled brick with a faint picture rail, plus wall TVs. */
+function drawInteriorWalls(v: View, groundHex: number, game: Game): void {
+  const wall = darken(groundHex, 0.42);
+  const wallLit = lighten(wall, 0.12);
+  const mortar = darken(wall, 0.5);
+  texRect(v, v.camX - 4, v.camY - 4, fb.w * v.s + 8, 206 - v.camY + 8, (wx, wy) => {
+    if (wy > 202) return -1;
+    const brickRow = Math.floor(wy / 9);
+    const inRow = ((wy % 9) + 9) % 9;
+    const joint = ((wx + (brickRow % 2) * 9 + 100000) % 18 + 18) % 18;
+    if (inRow < v.s || joint < v.s * 1.2) return mortar;
+    if (inRow < 2.6) return wallLit;
+    if (inRow > 7.4) return darken(wall, 0.14);
+    return hash2(Math.floor(wx / 5), Math.floor(wy / 5)) > 0.88 ? darken(wall, 0.12) : wall;
+  });
+  // Picture-rail trim where wall meets floor.
+  texRect(v, v.camX - 4, 200 - 3, fb.w * v.s + 8, 3, () => darken(wall, 0.32));
+
+  const spacing = 190;
+  const first = Math.floor((v.camX - 60) / spacing);
+  const last = Math.ceil((v.camX + fb.w * v.s + 60) / spacing);
+  for (let i = first; i <= last; i += 1) {
+    if (i === 0 && hash2(i, 91) > 0.25) continue; // not every room bay has one
+    const tx = i * spacing + (hash2(i, 31) * 50 - 25);
+    const ty = 40 + hash2(i, 57) * 30;
+    drawWallTv(v, tx, ty, i, game.time);
+  }
+}
+
+/** Wall-mounted TV running a live candle chart, flickering like a dying tube. */
+function drawWallTv(v: View, x: number, y: number, id: number, time: number): void {
+  const w = 36;
+  const h = 24;
+  const flicker = hash2(id * 7 + 1, Math.floor(time * 11)) > 0.92 ? 0.55 : 1;
+  texRect(v, x - 2, y - 2, w + 4, h + 4, () => 0x14161e);
+  texRect(v, x, y, w, h, (wx, wy) => {
+    void wx;
+    const t = (wy - y) / h;
+    return lerpC(lerpC(0x0e1812, 0x16241a, t), 0x000000, 1 - flicker);
+  });
+  const cols = Math.floor((w - 4) / 4);
+  for (let c = 0; c < cols; c += 1) {
+    const seed = c + Math.floor(time * 3) + id * 97;
+    const up = hash2(seed, 13) > 0.45;
+    const colBase = up ? lerpC(0x36bd63, 0x6fe08a, flicker) : lerpC(0xd64533, 0xf07a6a, flicker);
+    const bodyH = 4 + hash2(seed, 23) * (h * 0.45);
+    let top = y + 3 + hash2(seed, 17) * (h - bodyH - 6);
+    top = clamp(top, y + 2, y + h - bodyH - 2);
+    const cx = x + 2 + c * 4;
+    texRect(v, cx + 1, top, 2, bodyH, () => colBase);
+    texRect(v, cx + 1.6, top - 2, 0.9, bodyH + 4, () => darken(colBase, 0.3));
+  }
+}
+
+/** Golden vault KEY pickup used by Level 5 venues (labels.pageNote === "Key"). */
+function drawKey(v: View, x: number, y: number, w: number, h: number, time: number): void {
+  const glow = (Math.sin(time * 4 + x * 0.11) * 0.5 + 0.5) * 0.28;
+  const gold = lighten(C_GOLD, glow);
+  texRect(v, x, y, w, h, (wx, wy) => {
+    const lx = (wx - x) / w;
+    const ly = (wy - y) / h;
+    const rx = (lx - 0.24) / 0.21;
+    const ry = (ly - 0.34) / 0.34;
+    const ring = rx * rx + ry * ry;
+    if (ring <= 0.62) return gold;
+    if (ring <= 1.7) return C_GOLD_DEEP;
+    if (ly > 0.44 && ly < 0.58 && lx > 0.36 && lx < 0.94) return gold;
+    if (ly >= 0.58 && ly < 0.8 && ((lx > 0.64 && lx < 0.76) || lx > 0.82)) return C_GOLD_DEEP;
+    return -1;
+  });
+}
+
 function drawSolid(game: Game, v: View, solid: Solid, sky2: number, ground: number, accent: number): void {
   const { x, y, w, h, kind } = solid;
+  const dressed = isInterior(game) && hasDressedInteriors(game);
 
   if (kind === "ground") {
+    if (dressed) {
+      // Checkered marble (wallstreet) / casino carpet (mania) with grout and
+      // flecks, plus a polished highlight along the walkable top edge.
+      const tileA = game.currentLevel().theme === "wallstreet"
+        ? lerpC(ground, 0xf6f1e0, 0.34)
+        : lerpC(accent, 0xf6f1e0, 0.22);
+      const tileB = darken(lerpC(ground, C_INK, 0.3), 0.08);
+      texRect(v, x, y, w, h, (wx, wy) => {
+        if (wy < y + 2) return lighten(tileA, 0.3);
+        const cx = Math.floor(wx / 8);
+        const cy = Math.floor((wy - y) / 8);
+        const checker = (cx + cy) % 2 === 0 ? tileA : tileB;
+        const gx = ((wx % 8) + 8) % 8;
+        const gy = (((wy - y) % 8) + 8) % 8;
+        if (gx < 0.9 || gy < 0.9) return darken(checker, 0.38);
+        return hash2(cx * 5 + cy, cy * 3) > 0.93 ? lighten(checker, 0.2) : checker;
+      });
+      return;
+    }
     const grass = lerpC(ground, 0x9be070, 0.28);
     const soil = darken(ground, 0.18);
     const mortar = darken(ground, 0.45);
@@ -437,10 +545,20 @@ function drawSolid(game: Game, v: View, solid: Solid, sky2: number, ground: numb
     return;
   }
 
-  // "ledger" platforms and "block" stacks: warm brick with seams.
+  // "ledger" platforms and "block" stacks: warm brick with seams; dressed
+  // interiors get beveled crate/desk faces instead.
   const base = kind === "block" ? lerpC(0x8a5a30, accent, 0.25) : lerpC(0x7a4c28, accent, 0.35);
   texRect(v, x, y, w, h, (wx, wy) => {
     const by = wy - y;
+    if (dressed) {
+      const bx = wx - x;
+      const edge = 2;
+      if (by < edge) return lighten(base, 0.38);
+      if (bx < edge) return lighten(base, 0.16);
+      if (by > h - edge) return darken(base, 0.42);
+      if (bx > w - edge) return darken(base, 0.24);
+      return hash2(Math.floor(wx / 6), Math.floor(by / 6)) > 0.9 ? darken(base, 0.08) : base;
+    }
     if (by < 2) return lighten(base, 0.3);
     if (by > h - 2) return darken(base, 0.35);
     const seg = (wx - x + 100000) % 14;
@@ -518,13 +636,32 @@ function drawOverworld(game: Game, scale: Scale, sky: number, sky2: number, acce
   const winDark = darken(building, 0.3);
   const water = lerpC(0x142644, sky2, 0.2);
   const wavePhase = Math.floor(game.time * 2.5);
+  const level = game.currentLevel();
+  const venueTotal = level.mode === "overworld" ? Object.keys(level.venues).length : 4;
+  const wallstreet = level.mode === "overworld" && level.theme === "wallstreet";
+
+  // Facade texture shared by plain buildings and venue-door blocks.
+  const buildingTex = (tx: number, ty: number) => (wx: number, wy: number): number => {
+    const bx = wx - tx * TILE;
+    const by = wy - ty * TILE;
+    if (by < 2.4) return roof;
+    const inWx = (bx >= 3 && bx <= 6) || (bx >= 10 && bx <= 13);
+    const inWy = (by >= 4 && by <= 7) || (by >= 10 && by <= 13);
+    if (inWx && inWy) {
+      return hash2(tx * 13 + Math.floor(bx / 7), ty * 7 + Math.floor(by / 6)) > 0.5 ? winLit : winDark;
+    }
+    return building;
+  };
 
   const startTx = Math.max(0, Math.floor(camX / TILE));
   const startTy = Math.max(0, Math.floor(camY / TILE));
   const endTx = Math.min(game.ow.cols, Math.ceil((camX + visW) / TILE) + 1);
   const endTy = Math.min(game.ow.rows, Math.ceil((camY + visH) / TILE) + 1);
-  const level = game.currentLevel();
-  const venueTotal = level.mode === "overworld" ? Object.keys(level.venues).length : 4;
+
+  const tallAt = (tx: number, ty: number): boolean => {
+    const c = game.ow.grid[ty]?.[tx] ?? "#";
+    return c === "#" || c === "t";
+  };
 
   for (let ty = startTy; ty < endTy; ty += 1) {
     const rowStr = game.ow.grid[ty] ?? "";
@@ -534,17 +671,7 @@ function drawOverworld(game: Game, scale: Scale, sky: number, sky2: number, acce
       const wy0 = ty * TILE;
 
       if (t === "#") {
-        texRect(v, wx0, wy0, TILE, TILE, (wx, wy) => {
-          const bx = wx - wx0;
-          const by = wy - wy0;
-          if (by < 2.4) return roof;
-          const inWx = (bx >= 3 && bx <= 6) || (bx >= 10 && bx <= 13);
-          const inWy = (by >= 4 && by <= 7) || (by >= 10 && by <= 13);
-          if (inWx && inWy) {
-            return hash2(tx * 13 + Math.floor(bx / 7), ty * 7 + Math.floor(by / 6)) > 0.5 ? winLit : winDark;
-          }
-          return building;
-        });
+        texRect(v, wx0, wy0, TILE, TILE, buildingTex(tx, ty));
         continue;
       }
 
@@ -560,25 +687,31 @@ function drawOverworld(game: Game, scale: Scale, sky: number, sky2: number, acce
 
       if (t >= "1" && t <= "9") {
         const cleared = game.venuesCleared.includes(t);
-        const doorC = cleared ? 0x36bd63 : lerpC(accent, 0xf7931a, 0.4);
-        texRect(v, wx0, wy0, TILE, TILE, (wx, wy) => {
-          const bx = wx - wx0;
-          const by = wy - wy0;
-          if (by < 2.4) return roof;
-          if (bx >= 4 && bx <= 12 && by >= 5) {
-            if (bx < 5.2 || bx > 10.8 || by < 6.2) return lighten(doorC, 0.25);
-            return doorC;
-          }
-          return building;
+        const flash = !cleared && Math.floor(game.time * 3 + tx * 1.7) % 7 === 0;
+        const neon = cleared ? 0x36bd63 : flash ? 0xffd166 : lerpC(accent, 0xf7931a, 0.4);
+        texRect(v, wx0, wy0, TILE, TILE, buildingTex(tx, ty));
+        // Neon entrance sign: soft glow halo behind a bright board.
+        texRect(v, wx0 + 2, wy0 + 4, TILE - 4, TILE - 5, () => lerpC(neon, building, 0.55));
+        texRect(v, wx0 + 4, wy0 + 6, TILE - 8, TILE - 9, (wx, wy) => {
+          const bx = wx - wx0 - 4;
+          const by = wy - wy0 - 6;
+          const bw = TILE - 8;
+          const bh = TILE - 9;
+          if (bx < 1 || by < 1 || bx > bw - 1 || by > bh - 1) return darken(neon, 0.45);
+          return neon;
         });
         const px = Math.floor((wx0 + TILE / 2 - camX) / s) - 1;
-        const py = Math.floor((wy0 + 8 - camY) / s) - 2;
-        drawTiny(fb, px, py, t, 1, C_WHITE);
+        const py = Math.floor((wy0 + 9 - camY) / s) - 2;
+        drawTiny(fb, px, py, t, 1, cleared ? 0xeaffea : C_WHITE);
         continue;
       }
 
       if (t === "X") {
         const open = game.venuesCleared.length >= venueTotal;
+        if (wallstreet) {
+          drawBullExit(v, wx0, wy0, open, game.time);
+          continue;
+        }
         const vaultGlow = open ? (Math.sin(game.time * 4) * 0.5 + 0.5) * 0.3 : 0;
         const gold = open ? lighten(0xf7931a, vaultGlow) : 0x5a5248;
         texRect(v, wx0, wy0, TILE, TILE, (wx, wy) => {
@@ -593,7 +726,7 @@ function drawOverworld(game: Game, scale: Scale, sky: number, sky2: number, acce
         continue;
       }
 
-      // Pavement, with planter "o" and coin "c" variants on top.
+      // Street base (also under doors, crosswalks, manholes, sats, trees).
       texRect(v, wx0, wy0, TILE, TILE, (wx, wy) => {
         const seamX = ((wx % TILE) + TILE) % TILE;
         const seamY = ((wy % TILE) + TILE) % TILE;
@@ -601,21 +734,56 @@ function drawOverworld(game: Game, scale: Scale, sky: number, sky2: number, acce
         return hash2(Math.floor(wx / 3), Math.floor(wy / 3)) > 0.85 ? roadLite : road;
       });
 
-      if (t === "o") {
-        const cx = wx0 + TILE / 2;
-        const cy = wy0 + TILE / 2;
-        texRect(v, wx0 + 2, wy0 + 2, TILE - 4, TILE - 4, (wx, wy) => {
-          const d = Math.hypot(wx - cx, wy - cy);
-          if (d > 6) return -1;
-          if (d > 5) return 0x3a3026;
-          return hash2(Math.floor(wx / 2), Math.floor(wy / 2)) > 0.6 ? 0x2f8d50 : 0x25703f;
+      // Cast shadows off anything tall onto the street below/right of it.
+      if (t !== "g") {
+        if (tallAt(tx - 1, ty)) texRect(v, wx0, wy0, 3, TILE, () => darken(road, 0.26));
+        if (tallAt(tx, ty - 1)) texRect(v, wx0, wy0, TILE, 3, () => darken(road, 0.2));
+      }
+
+      if (t === "g" || t === "t") {
+        // Dithered park grass, offset by tile parity so the checker flows.
+        const parity = (tx + ty) % 2 === 0;
+        const gA = lerpC(0x2f8d50, sky2, 0.12);
+        const gB = lerpC(0x25703f, sky2, 0.12);
+        texRect(v, wx0, wy0, TILE, TILE, (wx, wy) => {
+          const even = (Math.floor(wx / 4) + Math.floor(wy / 4)) % 2 === 0;
+          return even === parity ? gA : gB;
         });
+      }
+
+      if (t === "z") {
+        // Crosswalk: worn pedestrian stripes across the road.
+        const pale = lerpC(road, 0xf6f1e0, 0.55);
+        texRect(v, wx0, wy0, TILE, TILE, (wx, wy) => {
+          const band = ((wy - wy0) % 6 + 6) % 6;
+          if (band >= 2.4) return -1;
+          return hash2(Math.floor(wx / 2), Math.floor(wy / 2)) > 0.86 ? darken(pale, 0.14) : pale;
+        });
+      }
+
+      if (t === "t") drawTree(v, wx0, wy0, tx, game.time);
+
+      if (t === "o") {
+        if (wallstreet) drawManhole(v, wx0, wy0, tx, ty, game.time, road);
+        else {
+          const cx = wx0 + TILE / 2;
+          const cy = wy0 + TILE / 2;
+          texRect(v, wx0 + 2, wy0 + 2, TILE - 4, TILE - 4, (wx, wy) => {
+            const d = Math.hypot(wx - cx, wy - cy);
+            if (d > 6) return -1;
+            if (d > 5) return 0x3a3026;
+            return hash2(Math.floor(wx / 2), Math.floor(wy / 2)) > 0.6 ? 0x2f8d50 : 0x25703f;
+          });
+        }
       } else if (t === "c") {
         const taken = game.ow.coins.some((c) => c.tx === tx && c.ty === ty && c.taken);
         if (!taken) coinAt(v, wx0 + TILE / 2, wy0 + TILE / 2, 5, game.time);
       }
     }
   }
+
+  // Taxis above street furniture, below the walker.
+  for (const taxi of game.ow.taxis) drawTaxi(v, taxi);
 
   for (const npc of game.ow.npcs) {
     const pal = NPC_SKINS[npc.kind] ?? DEFAULT_NPC_PAL;
@@ -628,6 +796,89 @@ function drawOverworld(game: Game, scale: Scale, sky: number, sky2: number, acce
     game.owPlayer.x, game.owPlayer.y + bob, game.owPlayer.w, game.owPlayer.h,
     game.owPlayer.facing === "left"
   );
+}
+
+/** Park tree: shaded trunk plus a three-tone canopy that sways slightly. */
+function drawTree(v: View, wx0: number, wy0: number, tx: number, time: number): void {
+  const sway = Math.sin(time * 1.6 + tx * 1.3) * 1.1;
+  const cx = wx0 + TILE / 2 + sway;
+  const cy = wy0 + 6;
+  texRect(v, wx0 - 2, wy0 - 3, TILE + 4, TILE + 4, (wx, wy) => {
+    const dx = (wx - cx) / 8.5;
+    const dy = (wy - cy) / 8.5;
+    const d = dx * dx + dy * dy;
+    if (d < 1) {
+      if (dx + dy < -0.5) return lighten(0x33944a, 0.22);
+      if (d > 0.6) return 0x256e35;
+      return 0x33944a;
+    }
+    if (Math.abs(wx - (wx0 + TILE / 2)) < 1.6 && wy > cy + 4.5) return 0x5a4028;
+    return -1;
+  });
+}
+
+/** Steaming manhole: iron grate disc plus wisps of steam drifting upward. */
+function drawManhole(v: View, wx0: number, wy0: number, tx: number, ty: number, time: number, road: number): void {
+  const cx = wx0 + TILE / 2;
+  const cy = wy0 + TILE / 2;
+  texRect(v, wx0 + 2, wy0 + 2, TILE - 4, TILE - 4, (wx, wy) => {
+    const d = Math.hypot(wx - cx, wy - cy);
+    if (d > 5.4) return -1;
+    if (d > 4.4) return 0x35302a;
+    return hash2(Math.floor(wx / 1.6), Math.floor(wy / 1.6)) > 0.72 ? 0x26221d : 0x1c1915;
+  });
+  for (let wisp = 0; wisp < 3; wisp += 1) {
+    const phase = hash2(tx * 3 + wisp, ty * 7);
+    const rise = (time * 10 + phase * 18) % 18;
+    const alpha = 0.32 * (1 - rise / 18);
+    const sx = wx0 + 5 + phase * 6 + Math.sin(time * 2 + phase * 9) * 1.2;
+    const sy = wy0 + 8 - rise;
+    fb.rect(
+      Math.floor((sx - v.camX) / v.s),
+      Math.floor((sy - v.camY) / v.s),
+      2, 2,
+      lerpC(road, 0xe8ecf4, alpha)
+    );
+  }
+}
+
+/** Yellow cab with glass band and checker skirt; collision box == body. */
+function drawTaxi(v: View, taxi: Taxi): void {
+  const body = 0xf7c520;
+  texRect(v, taxi.x, taxi.y, taxi.w, taxi.h, (wx, wy) => {
+    const lx = wx - taxi.x;
+    const ly = wy - taxi.y;
+    if (ly < 2.2) return lighten(body, 0.24);
+    if (ly > taxi.h - 2.4) return 0x1c1c22;
+    const front = taxi.dir > 0 ? lx > taxi.w - 3.6 : lx < 3.6;
+    if (front) return lerpC(body, 0xfff2c0, 0.4);
+    const glassFront = taxi.dir > 0 ? lx > taxi.w * 0.42 : lx < taxi.w * 0.58;
+    if (ly > 3.4 && ly < 7 && glassFront && lx > 2.2 && lx < taxi.w - 2.2) return 0x27303c;
+    if (ly > taxi.h - 4.4 && Math.floor(lx / 2.4) % 2 === 0) return darken(body, 0.5);
+    return body;
+  });
+}
+
+/** The CHARGING BULL: stone statue while locked, glowing gold once woken. */
+function drawBullExit(v: View, wx0: number, wy0: number, awake: boolean, time: number): void {
+  texRect(v, wx0 + 1, wy0 + 11, TILE - 2, 5, (wx, wy) => {
+    void wx;
+    const by = wy - wy0 - 11;
+    const stone = awake ? 0x8a8578 : 0x565349;
+    if (by < 1.2) return lighten(stone, 0.24);
+    if (by > 3.6) return darken(stone, 0.22);
+    return stone;
+  });
+  const glow = (Math.sin(time * 4) * 0.5 + 0.5) * 0.22;
+  const pal: Palette = awake
+    ? { g: lighten(0xf7931a, glow), h: 0xffd166, f: 0xc8860a, t: 0xc8860a, K: 0x8a5c0a }
+    : { g: 0x8a8578, h: 0xa8a498, f: 0x6f6b60, t: 0x6f6b60, K: 0x54514a };
+  spriteBox(v, BULL, pal, wx0, wy0 - 1, TILE, 12);
+  if (awake) {
+    const px = Math.floor((wx0 + TILE / 2 - v.camX) / v.s);
+    const py = Math.floor((wy0 + 6 - v.camY) / v.s);
+    drawTiny(fb, px - 1, py - 8, "B", 1, 0xffd166);
+  }
 }
 
 // --- HUD and overlays -------------------------------------------------------
@@ -691,7 +942,7 @@ function drawTitle(screen: Screen, game: Game): void {
     screen.write(boxX + 4, top + 4 + i, clip(line, boxW - 8), i === game.levelIndex ? ORANGE : PAPER, INK);
   }
   screen.write(boxX + 4, top + 9, clip(game.levels()[game.levelIndex]?.description ?? "", boxW - 8), GRAY, INK);
-  center(screen, top + 12, "ENTER start   UP/DOWN select   1-4 jump   Q quit", GRAY, INK);
+  center(screen, top + 12, `ENTER start   UP/DOWN select   1-${game.levels().length} jump   Q quit`, GRAY, INK);
   center(screen, top + 13, "WASD or arrows to move, SPACE to jump", GRAY, INK);
 }
 

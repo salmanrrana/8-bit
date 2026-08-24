@@ -212,7 +212,14 @@ export const NPC_SKINS: Record<string, Palette> = {
   hal: npcPal(0x9aa0a8, 0x36bd63),
   nodes: npcPal(0x4a3626, 0x36bd63),
   mallers: npcPal(0x2a2a30, 0x4aa8f0),
-  crowd: npcPal(0x4a3626, 0xffd166)
+  crowd: npcPal(0x4a3626, 0xffd166),
+  // Wall Street (Level 5) street cast.
+  fink: npcPal(0xc8ccd4, 0x1c1c24),
+  saylor: npcPal(0xd8b890, 0xf7931a),
+  vendor: npcPal(0x3a5a2a, 0xffd166),
+  banker: npcPal(0x2a2a30, 0x4a525e),
+  analyst: npcPal(0x6a4a2a, 0x8d6de8),
+  cabbie: npcPal(0x4a3626, 0xf7931a)
 };
 
 export const DEFAULT_NPC_PAL: Palette = npcPal(0x4a3626, 0x8d6de8);
@@ -232,6 +239,20 @@ export const OW_HERO: Art = [
   "..pp..pp..",
   ".KKK..KKK.",
   ".KKK..KKK."
+];
+
+// --- Charging Bull (Level 5 exit): 16x11, faces right ----------------------
+
+export const BULL: Art = [
+  "...........hh.h.",
+  ".t........hhffh.",
+  ".tt.gggggg.ffff.",
+  "..ttggggggggfff.",
+  "...ggggggggggg..",
+  "..gggggggggggg..",
+  "..gg.gg..gg.gg..",
+  "..KK.KK..KK.KK..",
+  "................"
 ];
 
 // --- Whitepaper page: 11x14 ------------------------------------------------

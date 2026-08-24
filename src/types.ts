@@ -28,7 +28,9 @@ export type ConfirmCycle = {
   onMs: number;
 };
 
-export type Theme = "city" | "network" | "tour" | "mania";
+export type Theme = "city" | "network" | "tour" | "mania" | "wallstreet";
+
+export type GoalKind = "up" | "down" | "exit";
 
 export type Zone = {
   x: number;
@@ -88,6 +90,30 @@ export type NpcDef = {
   lines: string[];
 };
 
+/** Overworld taxi traffic: ping-pong route on a fixed clock. */
+export type TaxiRoute = {
+  axis: "v" | "h";
+  lane?: number;
+  row?: number;
+  from: number;
+  to: number;
+  speed: number;
+  phase: number;
+};
+
+/** One floor of a multi-floor venue (Level 5). Floors list top-to-bottom as played. */
+export type VenueFloor = {
+  name: string;
+  worldW: number;
+  spawnX: number;
+  zone: Omit<Zone, "x">;
+  goal: Box & { kind?: GoalKind };
+  /** Where a stairwell ("up"/"down") goal leads; index into floors[]. */
+  goalTo?: number;
+  hint?: string;
+  layout: Layout;
+};
+
 export type Venue = {
   key: string;
   index: number;
@@ -95,9 +121,11 @@ export type Venue = {
   worldW: number;
   spawnX: number;
   zone: Omit<Zone, "x">;
-  goal: Box;
+  goal: Box & { kind?: GoalKind };
   weapon?: "satcannon";
   layout: Layout;
+  /** Multi-floor building; when present, layout/goal are ignored in play. */
+  floors?: VenueFloor[];
 };
 
 export type Box = { x: number; y: number; w: number; h: number };
@@ -128,6 +156,7 @@ export type OverworldLevel = {
   spawn: { tx: number; ty: number };
   map: string[];
   npcs: NpcDef[];
+  taxis?: TaxiRoute[];
   venues: Record<string, Venue>;
 };
 

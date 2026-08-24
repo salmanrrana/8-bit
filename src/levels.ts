@@ -362,5 +362,385 @@ export const LEVELS: Level[] = [
         }
       }
     }
+  },
+  {
+    // Level 5 — "WALL STREET". The institutional-adoption era: a New York
+    // style financial district overworld (park, crosswalks, steaming
+    // manholes, deterministic taxi traffic that costs a life on contact)
+    // wrapped around four MULTI-FLOOR venues. Stairwell goals chain floors
+    // together — climb UP to a roof exit or descend DOWN to a vault exit —
+    // and a building only clears when every enemy across ALL floors was
+    // stomped in one visit; leaving resets it. Clear all four to wake the
+    // CHARGING BULL and finish.
+    id: "wall-street",
+    title: "WALL STREET",
+    description: "2024: institutions pile in. Clear four towers, dodge taxis, wake the Bull.",
+    theme: "wallstreet",
+    mode: "overworld",
+    labels: { coin: "SATS", pageStat: "KEYS", pageNote: "Key" },
+    worldW: 512,
+    goal: { x: 0, y: 0, w: 0, h: 0 },
+    zone: { name: "WALL STREET", sky: "#3a4356", sky2: "#1c2130", ground: "#565d63", accent: "#f7931a", text: "2024: Wall Street piles in. The agents want you out." },
+    spawn: { tx: 8, ty: 20 },
+    // Tile legend (extends Level 4's): '#' building, '~' water (both solid),
+    // 't' tree (solid), 'g' park grass (walkable), 'z' crosswalk (decor),
+    // '.' street, 'o' steaming manhole, 'c' sat pickup, '1'-'4' venue doors,
+    // 'X' the Charging Bull exit. All rows must be equal length.
+    map: [
+      "~######################################~",
+      "~##..####..#####..#####..#####..####...~",
+      "~##..####..#####..#####..#####..####...~",
+      "~##..####..#####..#####..#####..####...~",
+      "~##..####..#####..##1##..#####..####...~",
+      "~.c....c..o..c..........o..c......c....~",
+      "~.........o.........c...o..............~",
+      "~##..####..tgggt..#####..#####..####...~",
+      "~##..####..gcggg..#####..#####..####...~",
+      "~##..####..gg~~g..#####..#####..####...~",
+      "~##..####..tggcg..#####..#####..####...~",
+      "~##..####..ggggg..##4##..#####..####...~",
+      "~..zz.c..zz..c..zz.....zz..c..zz..c.zzz~",
+      "~...o............c.....o.......o.......~",
+      "~##..####..#####..#####..#####..####...~",
+      "~##..####..#####..#####..#####..#..#...~",
+      "~##..####..#####..#####..#####..#.X#...~",
+      "~##..####..#####..#####..#####..#..#...~",
+      "~##..#2##..#####..#####..#####..#.##...~",
+      "~.c.....c.............................o~",
+      "~..zz....zz.....zz..c..zz....czz....zzz~",
+      "~##..####..#####..#####..tgggt..####...~",
+      "~##..####..#####..#####..gcggg..####...~",
+      "~##..####..#####..#####..gg~gg..####...~",
+      "~##..####..#####..#####..gggcg..####...~",
+      "~##..####..##3##..#####..ggggt..####...~",
+      "~.....c..........o..c......c...........~",
+      "~........o...c...................c.....~",
+      "~....c...............c...............c.~",
+      "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"
+    ],
+    npcs: [
+      { kind: "fink", tx: 18, ty: 6, name: "LARRY FINK", lines: ["Larry Fink: Bitcoin is here to stay. Our clients asked.", "You: welcome to the network."] },
+      { kind: "saylor", tx: 21, ty: 6, name: "MICHAEL SAYLOR", lines: ["Saylor: we bought more. Then more. There is no top.", "You: conviction noted."] },
+      { kind: "warner", tx: 22, ty: 5, name: "TOWER GUARD", lines: ["Guard: suits inside keep tossing visitors out.", "Guard: stomp their heads. Watch for shooters.", "You: they cannot eject the network."] },
+      { kind: "vendor", tx: 12, ty: 6, name: "VENDOR", lines: ["Vendor: hot dogs now cost 2,000 sats. Progress.", "You: cheap at twice the price."] },
+      { kind: "banker", tx: 19, ty: 13, name: "BANKER", lines: ["Banker: we mocked it in 2013. Now we custody it.", "You: funny how that works."] },
+      { kind: "analyst", tx: 22, ty: 13, name: "ANALYST", lines: ["Analyst: ETFs approved, supply halved. Do the math.", "You: the math was always there."] },
+      { kind: "cabbie", tx: 6, ty: 20, name: "CABBIE", lines: ["Cabbie: Wall Street? Everybody asks for Bitcoin now.", "You: then drive fast."] },
+      { kind: "maxi", tx: 33, ty: 20, name: "MAXI", lines: ["Maxi: they finally came to us. Stay humble.", "You: tick tock."] }
+    ],
+    // Taxi routes over the avenues/streets. Ping-pong on a fixed clock —
+    // no randomness, ANY% safe. Touching a cab costs a life and respawns
+    // you at the spawn curb. Routes avoid the spawn tile by a safe margin.
+    taxis: [
+      { axis: "v", lane: 3, from: 5, to: 27, speed: 64, phase: 0 },
+      { axis: "v", lane: 31, from: 5, to: 27, speed: 76, phase: 260 },
+      { axis: "h", row: 12, from: 3, to: 38, speed: 88, phase: 140 }
+    ],
+    venues: {
+      "1": {
+        key: "1", index: 1, name: "BLACKROCK TOWER",
+        worldW: 800, spawnX: 22,
+        zone: { name: "BLACKROCK TOWER", sky: "#a89c82", sky2: "#6a6250", ground: "#5c5248", accent: "#f7931a", text: "The UP climb: lobby to boardroom roof." },
+        goal: { x: -100, y: -100, w: 0, h: 0 },
+        layout: { ground: [], platforms: [], coinArcs: [], pages: [], enemies: [], hazards: [] },
+        floors: [
+          {
+            name: "LOBBY", worldW: 800, spawnX: 22,
+            zone: { name: "BLACKROCK · LOBBY", sky: "#a89c82", sky2: "#6a6250", ground: "#5c5248", accent: "#f7931a", text: "The lobby of adoption. The agents didn't get the memo." },
+            goal: { x: 742, y: 140, w: 30, h: 64, kind: "up" }, goalTo: 1,
+            hint: "Take the stairs up.",
+            layout: {
+              ground: [[0, 800]],
+              platforms: [
+                [180, 158, 64, 14, "ledger"], [330, 136, 56, 14, "question"],
+                [480, 152, 66, 14, "ledger"], [640, 130, 54, 14, "ledger"]
+              ],
+              coinArcs: [[120, 128, 4], [340, 112, 5], [500, 116, 4], [650, 106, 4]],
+              pages: [],
+              enemies: [
+                [150, 178, 110, 260, "agent"], [300, 178, 270, 430, "suit"],
+                [520, 178, 470, 640, "agent"], [680, 178, 630, 726, "agent"]
+              ],
+              hazards: []
+            }
+          },
+          {
+            name: "TRADING FLOOR", worldW: 920, spawnX: 22,
+            zone: { name: "BLACKROCK · TRADING FLOOR", sky: "#a89c82", sky2: "#6a6250", ground: "#5c5248", accent: "#f7931a", text: "Traders, terminals, tails. Elevator shafts are open." },
+            goal: { x: 852, y: 140, w: 30, h: 64, kind: "up" }, goalTo: 2,
+            hint: "One floor up.",
+            layout: {
+              ground: [[0, 380], [460, 460]],
+              platforms: [
+                [160, 150, 62, 14, "ledger"], [300, 128, 56, 14, "question"],
+                [392, 158, 56, 14, "ledger"],
+                [520, 146, 68, 14, "ledger"], [660, 124, 58, 14, "question"],
+                [800, 150, 62, 14, "ledger"]
+              ],
+              coinArcs: [[130, 126, 4], [310, 108, 5], [420, 132, 3], [540, 120, 5], [680, 102, 4]],
+              pages: [],
+              enemies: [
+                [200, 178, 140, 320, "agent"], [350, 178, 300, 450, "suit"],
+                [560, 178, 500, 680, "agent"], [750, 178, 700, 836, "suit"]
+              ],
+              hazards: [[600, 190, 38, 15]]
+            }
+          },
+          {
+            name: "BOARDROOM", worldW: 860, spawnX: 22,
+            zone: { name: "BLACKROCK · BOARDROOM", sky: "#a89c82", sky2: "#6a6250", ground: "#5c5248", accent: "#f7931a", text: "The boardroom. Even here, they want you out." },
+            goal: { x: 792, y: 140, w: 30, h: 64, kind: "exit" },
+            hint: "Top floor. Roof door is the way out.",
+            layout: {
+              ground: [[0, 360], [440, 420]],
+              platforms: [
+                [170, 148, 64, 14, "ledger"], [280, 126, 56, 14, "question"],
+                [372, 156, 56, 14, "ledger"],
+                [452, 144, 66, 14, "ledger"], [600, 122, 56, 14, "question"],
+                [730, 148, 62, 14, "ledger"]
+              ],
+              coinArcs: [[140, 124, 4], [300, 106, 5], [470, 118, 5], [620, 98, 4]],
+              pages: [[760, 124]],
+              enemies: [
+                [190, 178, 130, 300, "suit"], [400, 178, 360, 520, "agent"],
+                [560, 178, 530, 660, "agent"], [700, 178, 660, 770, "suit"]
+              ],
+              hazards: [[500, 190, 36, 15]]
+            }
+          }
+        ]
+      },
+      "2": {
+        key: "2", index: 2, name: "FIAT NATIONAL BANK",
+        worldW: 880, spawnX: 22,
+        zone: { name: "FIAT NATIONAL BANK", sky: "#9aa0ac", sky2: "#5a6070", ground: "#4e545c", accent: "#f7931a", text: "The DOWN dive: marble hall to the vault." },
+        goal: { x: -100, y: -100, w: 0, h: 0 },
+        layout: { ground: [], platforms: [], coinArcs: [], pages: [], enemies: [], hazards: [] },
+        floors: [
+          {
+            name: "MARBLE HALL", worldW: 880, spawnX: 22,
+            zone: { name: "FIAT NATIONAL · MARBLE HALL", sky: "#9aa0ac", sky2: "#5a6070", ground: "#4e545c", accent: "#f7931a", text: "Marble halls, reversible promises. Head down." },
+            goal: { x: 822, y: 140, w: 30, h: 64, kind: "down" }, goalTo: 1,
+            hint: "The stairs go DOWN here.",
+            layout: {
+              ground: [[0, 400], [480, 400]],
+              platforms: [
+                [180, 152, 64, 14, "ledger"], [320, 130, 56, 14, "question"],
+                [392, 158, 56, 14, "ledger"],
+                [540, 148, 66, 14, "ledger"], [690, 126, 56, 14, "question"],
+                [800, 150, 60, 14, "ledger"]
+              ],
+              coinArcs: [[130, 128, 4], [330, 110, 5], [410, 132, 3], [560, 120, 5], [700, 104, 4]],
+              pages: [],
+              enemies: [
+                [160, 178, 110, 290, "suit"], [360, 178, 300, 460, "suit"],
+                [580, 178, 520, 700, "agent"], [740, 178, 700, 806, "suit"]
+              ],
+              hazards: []
+            }
+          },
+          {
+            name: "SECURITY CORRIDOR", worldW: 960, spawnX: 22,
+            zone: { name: "FIAT NATIONAL · SECURITY", sky: "#9aa0ac", sky2: "#5a6070", ground: "#4e545c", accent: "#f7931a", text: "Vault defense: turrets and suits. Hop the shots." },
+            goal: { x: 882, y: 140, w: 30, h: 64, kind: "down" }, goalTo: 2,
+            hint: "Deeper. Watch the guns.",
+            layout: {
+              ground: [[0, 340], [420, 300], [800, 160]],
+              platforms: [
+                [150, 150, 60, 14, "ledger"], [262, 156, 58, 14, "ledger"],
+                [352, 158, 56, 14, "ledger"],
+                [470, 146, 66, 14, "ledger"], [600, 124, 56, 14, "question"],
+                [722, 158, 56, 14, "ledger"]
+              ],
+              coinArcs: [[120, 126, 4], [370, 134, 3], [480, 120, 5], [610, 102, 4], [830, 116, 4]],
+              pages: [],
+              enemies: [
+                [140, 178, 100, 250, "agent"], [430, 178, 390, 560, "suit"],
+                [600, 178, 600, 600, "shitgun"], [700, 178, 650, 760, "suit"],
+                [880, 178, 880, 880, "shitgun"]
+              ],
+              hazards: [[540, 190, 40, 15]]
+            }
+          },
+          {
+            name: "THE VAULT", worldW: 840, spawnX: 22,
+            zone: { name: "FIAT NATIONAL · THE VAULT", sky: "#9aa0ac", sky2: "#5a6070", ground: "#4e545c", accent: "#f7931a", text: "They kept gold here once. Take the key instead." },
+            goal: { x: 774, y: 140, w: 30, h: 64, kind: "exit" },
+            hint: "Grab the key. Get out.",
+            layout: {
+              ground: [[0, 840]],
+              platforms: [
+                [170, 150, 62, 14, "ledger"], [300, 128, 56, 14, "question"],
+                [450, 146, 66, 14, "ledger"], [590, 124, 56, 14, "ledger"],
+                [720, 150, 60, 14, "ledger"]
+              ],
+              coinArcs: [[120, 126, 4], [320, 108, 5], [470, 120, 5], [610, 102, 4]],
+              pages: [[600, 100]],
+              enemies: [
+                [180, 178, 120, 280, "shitgun"], [320, 178, 290, 430, "agent"],
+                [500, 178, 460, 620, "suit"], [660, 178, 630, 750, "agent"],
+                [700, 178, 690, 740, "shitgun"]
+              ],
+              hazards: []
+            }
+          }
+        ]
+      },
+      "3": {
+        key: "3", index: 3, name: "LEGACY MEDIA HOUSE",
+        weapon: "satcannon",
+        worldW: 860, spawnX: 22,
+        zone: { name: "LEGACY MEDIA HOUSE", sky: "#a89a82", sky2: "#6a5e4c", ground: "#5a5044", accent: "#f7931a", text: "The paywall climb: SAT CANNON opens doors." },
+        goal: { x: -100, y: -100, w: 0, h: 0 },
+        layout: { ground: [], platforms: [], coinArcs: [], pages: [], enemies: [], hazards: [] },
+        floors: [
+          {
+            name: "LOBBY", worldW: 860, spawnX: 22,
+            zone: { name: "LEGACY MEDIA · LOBBY", sky: "#a89a82", sky2: "#6a5e4c", ground: "#5a5044", accent: "#f7931a", text: "Paywalls everywhere. The SAT CANNON opens them." },
+            goal: { x: 792, y: 140, w: 30, h: 64, kind: "up" }, goalTo: 1,
+            hint: "Blast the paywalls — X/F fires.",
+            layout: {
+              ground: [[0, 860]],
+              platforms: [
+                [170, 150, 60, 14, "ledger"], [310, 128, 56, 14, "question"],
+                [470, 148, 64, 14, "ledger"], [620, 126, 56, 14, "question"],
+                [760, 150, 60, 14, "ledger"]
+              ],
+              coinArcs: [[120, 126, 4], [330, 108, 5], [490, 122, 5], [640, 102, 4]],
+              pages: [],
+              enemies: [
+                [150, 178, 100, 230, "agent"], [400, 178, 360, 520, "rugpull"],
+                [700, 178, 660, 760, "agent"]
+              ],
+              hazards: [],
+              barricades: [[250, 4], [560, 4]]
+            }
+          },
+          {
+            name: "NEWSROOM", worldW: 1040, spawnX: 22,
+            zone: { name: "LEGACY MEDIA · NEWSROOM", sky: "#a89a82", sky2: "#6a5e4c", ground: "#5a5044", accent: "#f7931a", text: "They print FUD. The turrets print back." },
+            goal: { x: 972, y: 140, w: 30, h: 64, kind: "up" }, goalTo: 2,
+            hint: "Upstairs. Mind the turrets.",
+            layout: {
+              ground: [[0, 460], [540, 500]],
+              platforms: [
+                [160, 150, 62, 14, "ledger"], [290, 128, 56, 14, "question"],
+                [472, 158, 56, 14, "ledger"],
+                [600, 146, 68, 14, "ledger"], [740, 124, 58, 14, "question"],
+                [880, 150, 62, 14, "ledger"]
+              ],
+              coinArcs: [[130, 126, 4], [310, 108, 5], [490, 134, 3], [620, 120, 5], [760, 100, 4]],
+              pages: [],
+              enemies: [
+                [180, 178, 120, 300, "agent"], [380, 178, 330, 520, "rugpull"],
+                [560, 178, 560, 560, "shitgun"], [760, 178, 720, 880, "agent"],
+                [950, 178, 950, 950, "shitgun"], [900, 178, 880, 940, "suit"]
+              ],
+              hazards: [[640, 190, 38, 15]],
+              barricades: [[680, 4]]
+            }
+          },
+          {
+            name: "ROOFTOP STUDIO", worldW: 900, spawnX: 22,
+            zone: { name: "LEGACY MEDIA · ROOFTOP", sky: "#a89a82", sky2: "#6a5e4c", ground: "#5a5044", accent: "#f7931a", text: "Broadcast from the roof — then take the exit." },
+            goal: { x: 832, y: 140, w: 30, h: 64, kind: "exit" },
+            hint: "Roof door. Go.",
+            layout: {
+              ground: [[0, 380], [460, 440]],
+              platforms: [
+                [170, 148, 64, 14, "ledger"], [300, 126, 56, 14, "question"],
+                [392, 158, 56, 14, "ledger"],
+                [520, 146, 66, 14, "ledger"], [660, 122, 56, 14, "question"],
+                [790, 150, 60, 14, "ledger"]
+              ],
+              coinArcs: [[130, 124, 4], [320, 106, 5], [410, 132, 3], [540, 120, 5], [680, 98, 4]],
+              pages: [[820, 126]],
+              enemies: [
+                [200, 178, 140, 320, "agent"], [420, 178, 380, 520, "rugpull"],
+                [580, 178, 540, 680, "agent"], [720, 178, 690, 810, "suit"]
+              ],
+              hazards: [[500, 190, 36, 15]]
+            }
+          }
+        ]
+      },
+      "4": {
+        key: "4", index: 4, name: "THE EXCHANGE",
+        worldW: 1120, spawnX: 22,
+        zone: { name: "THE EXCHANGE", sky: "#98a4b4", sky2: "#5a6474", ground: "#505a64", accent: "#f7931a", text: "The mixed climb: up to the gallery, down to the lounge." },
+        goal: { x: -100, y: -100, w: 0, h: 0 },
+        layout: { ground: [], platforms: [], coinArcs: [], pages: [], enemies: [], hazards: [] },
+        floors: [
+          {
+            name: "TRADING FLOOR", worldW: 1120, spawnX: 22,
+            zone: { name: "THE EXCHANGE · FLOOR", sky: "#98a4b4", sky2: "#5a6474", ground: "#505a64", accent: "#f7931a", text: "Open outcry, closed minds. Gallery is upstairs." },
+            goal: { x: 1052, y: 140, w: 30, h: 64, kind: "up" }, goalTo: 1,
+            hint: "Gallery stairs, far side.",
+            layout: {
+              ground: [[0, 480], [560, 560]],
+              platforms: [
+                [160, 150, 62, 14, "ledger"], [290, 128, 56, 14, "question"],
+                [492, 158, 56, 14, "ledger"],
+                [620, 146, 68, 14, "ledger"], [760, 124, 58, 14, "question"],
+                [900, 150, 62, 14, "ledger"], [1010, 128, 56, 14, "question"]
+              ],
+              coinArcs: [[120, 126, 4], [310, 108, 5], [510, 134, 3], [640, 120, 5], [780, 100, 5], [1030, 112, 4]],
+              pages: [],
+              enemies: [
+                [170, 178, 120, 300, "degen"], [400, 178, 350, 540, "agent"],
+                [600, 178, 570, 720, "degen"], [820, 178, 780, 940, "agent"],
+                [980, 178, 950, 1030, "suit"], [930, 178, 920, 960, "shitgun"]
+              ],
+              hazards: [[680, 190, 40, 15]]
+            }
+          },
+          {
+            name: "GALLERY", worldW: 1000, spawnX: 22,
+            zone: { name: "THE EXCHANGE · GALLERY", sky: "#98a4b4", sky2: "#5a6474", ground: "#505a64", accent: "#f7931a", text: "Watch the floor from the gallery. Then descend." },
+            goal: { x: 932, y: 140, w: 30, h: 64, kind: "down" }, goalTo: 2,
+            hint: "Lounge is one flight down.",
+            layout: {
+              ground: [[0, 380], [460, 540]],
+              platforms: [
+                [150, 146, 62, 14, "ledger"], [280, 124, 56, 14, "question"],
+                [372, 158, 56, 14, "ledger"],
+                [500, 144, 66, 14, "ledger"], [640, 122, 56, 14, "question"],
+                [770, 148, 62, 14, "ledger"], [890, 126, 56, 14, "question"]
+              ],
+              coinArcs: [[120, 122, 4], [300, 104, 5], [390, 132, 3], [520, 118, 5], [660, 98, 4]],
+              pages: [],
+              enemies: [
+                [160, 178, 110, 270, "agent"], [340, 178, 300, 470, "suit"],
+                [550, 178, 510, 700, "agent"], [720, 178, 690, 850, "suit"],
+                [860, 178, 850, 890, "shitgun"]
+              ],
+              hazards: [[600, 190, 38, 15]]
+            }
+          },
+          {
+            name: "MEMBERS LOUNGE", worldW: 940, spawnX: 22,
+            zone: { name: "THE EXCHANGE · LOUNGE", sky: "#98a4b4", sky2: "#5a6474", ground: "#505a64", accent: "#f7931a", text: "Leather chairs, leather lungs. Take the exit." },
+            goal: { x: 862, y: 140, w: 30, h: 64, kind: "exit" },
+            hint: "Last door. End the run.",
+            layout: {
+              ground: [[0, 940]],
+              platforms: [
+                [180, 152, 64, 14, "ledger"], [320, 130, 56, 14, "question"],
+                [470, 148, 66, 14, "ledger"], [620, 126, 56, 14, "question"],
+                [770, 150, 60, 14, "ledger"]
+              ],
+              coinArcs: [[140, 128, 4], [340, 110, 5], [490, 122, 5], [640, 104, 4]],
+              pages: [[790, 126]],
+              enemies: [
+                [200, 178, 140, 320, "suit"], [400, 178, 360, 520, "agent"],
+                [600, 178, 570, 700, "suit"], [780, 178, 750, 830, "agent"],
+                [480, 178, 470, 510, "shitgun"]
+              ],
+              hazards: []
+            }
+          }
+        ]
+      }
+    }
   }
 ];

@@ -5,6 +5,7 @@ import type {
   Box,
   ConfirmCycle,
   EnemyType,
+  GoalKind,
   Level,
   OverworldLevel,
   Phase,
@@ -38,6 +39,9 @@ const SHITGUN_PERIOD = 1.7;
 const SHITCOIN_SPEED = 120;
 const SAT_SHOT_SPEED = 300;
 const FIRE_COOLDOWN = 0.35;
+/** Cab size in world units; collision box equals the drawn body. */
+const TAXI_W_H = 24;
+const TAXI_H_V = 13;
 
 export const ENEMY_TYPES: Record<EnemyType, { speed: number; score: number; stompToast: string; glyph: string }> = {
   banker: { speed: 28, score: 200, stompToast: "Threat cleared.", glyph: "B" },
@@ -94,6 +98,17 @@ export type OwPlayer = {
   h: number;
   facing: "up" | "down" | "left" | "right";
   moving: boolean;
+  invincible: number;
+};
+
+/** Live taxi state derived from its route each frame. */
+export type Taxi = {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  axis: "v" | "h";
+  dir: number;
 };
 
 function clamp(value: number, min: number, max: number): number {
@@ -117,6 +132,12 @@ export class Game {
   venuesCleared: string[] = [];
   stashesTaken: string[] = [];
   owReturn: { tx: number; ty: number } | null = null;
+  /** Multi-floor venues (Level 5): current floor, kills this visit, and the
+   * venue's total enemy count. A building clears only when visitKills
+   * reaches visitTotal in a single visit; leaving or dying resets it. */
+  floorIndex = 0;
+  visitKills = 0;
+  visitTotal = 0;
   toastQueue: string[] = [];
   cameraX = 0;
   cameraY = 0;
@@ -136,13 +157,15 @@ export class Game {
   worldW = 0;
   zones: Zone[] = [];
   venueZone: Zone | null = null;
-  goal: Box = { x: 0, y: 0, w: 0, h: 0 };
+  goal: Box & { kind?: GoalKind } = { x: 0, y: 0, w: 0, h: 0 };
 
   player: Player = {
     x: 32, y: 160, w: 14, h: 24, vx: 0, vy: 0, facing: 1,
     onGround: false, coyote: 0, jumpBuffer: 0, invincible: 0, fireCooldown: 0
   };
-  owPlayer: OwPlayer = { x: 0, y: 0, w: OW_PW, h: OW_PH, facing: "down", moving: false };
+  owPlayer: OwPlayer = {
+    x: 0, y: 0, w: OW_PW, h: OW_PH, facing: "down", moving: false, invincible: 0
+  };
 
   solids: Solid[] = [];
   coinsList: Pickup[] = [];
@@ -165,7 +188,8 @@ export class Game {
     coins: [] as Array<{ tx: number; ty: number; taken: boolean }>,
     doors: [] as Array<{ tx: number; ty: number; key: string }>,
     exit: null as { tx: number; ty: number } | null,
-    npcs: [] as Array<{ kind: string; tx: number; ty: number; name: string; lines: string[]; greeted: boolean }>
+    npcs: [] as Array<{ kind: string; tx: number; ty: number; name: string; lines: string[]; greeted: boolean }>,
+    taxis: [] as Taxi[]
   };
 
   private accumulator = 0;
@@ -193,7 +217,15 @@ export class Game {
   pageTotal(): number {
     const level = this.currentLevel();
     if (level.mode === "overworld") {
-      return Object.values(level.venues).reduce((sum, venue) => sum + (venue.layout.pages?.length ?? 0), 0);
+      let sum = 0;
+      for (const venue of Object.values(level.venues)) {
+        if (venue.floors?.length) {
+          sum += venue.floors.reduce((acc, floor) => acc + (floor.layout.pages?.length ?? 0), 0);
+        } else {
+          sum += venue.layout.pages?.length ?? 0;
+        }
+      }
+      return sum;
     }
     return level.layout.pages.length;
   }
@@ -313,7 +345,7 @@ export class Game {
 
     if (overlap(this.player, this.goal)) {
       if (this.subMode === "venue") {
-        this.exitVenue();
+        this.reachVenueGoal();
         return;
       }
       this.completeGame();
@@ -421,6 +453,11 @@ export class Game {
     this.ow.doors = [];
     this.ow.exit = null;
     this.ow.npcs = [];
+    this.ow.taxis = (level.taxis ?? []).map((route) => ({
+      x: 0, y: 0, w: route.axis === "h" ? TAXI_W_H : TAXI_H_V,
+      h: route.axis === "h" ? TAXI_H_V : TAXI_W_H,
+      axis: route.axis, dir: 1
+    }));
 
     for (let ty = 0; ty < this.ow.rows; ty += 1) {
       for (let tx = 0; tx < this.ow.cols; tx += 1) {
@@ -436,6 +473,7 @@ export class Game {
     this.owPlayer.y = level.spawn.ty * TILE + (TILE - OW_PH) / 2;
     this.owPlayer.facing = "down";
     this.owPlayer.moving = false;
+    this.owPlayer.invincible = 0;
     const mapW = this.ow.cols * TILE;
     const mapH = this.ow.rows * TILE;
     this.cameraX = clamp(this.owPlayer.x - this.viewW / 2, 0, Math.max(0, mapW - this.viewW));
@@ -502,10 +540,22 @@ export class Game {
 
     this.subMode = "venue";
     this.venueKey = key;
-    this.venueZone = { x: 0, ...venue.zone };
     const door = this.ow.doors.find((d) => d.key === key);
     if (door) this.owReturn = { tx: door.tx, ty: door.ty + 1 };
 
+    // Multi-floor building: one visit across all floors; dying or leaving
+    // resets it, so visitKills must reach the venue total in one go.
+    if (venue.floors?.length) {
+      this.visitKills = 0;
+      this.visitTotal = venue.floors.reduce((sum, floor) => sum + floor.layout.enemies.length, 0);
+      this.loadFloor(venue, 0);
+      return;
+    }
+
+    this.floorIndex = 0;
+    this.visitKills = 0;
+    this.visitTotal = 0;
+    this.venueZone = { x: 0, ...venue.zone };
     this.worldW = venue.worldW;
     Object.assign(this.goal, venue.goal);
     this.clearSide();
@@ -524,7 +574,46 @@ export class Game {
     }
     for (const [x, y, w, h] of layout.hazards ?? []) this.hazards.push({ x, y, w, h });
 
-    this.player.x = venue.spawnX;
+    this.spawnInVenue(venue.spawnX);
+    this.toast = venue.weapon === "satcannon"
+      ? "SAT CANNON armed! X/F shoots. Break the token walls."
+      : `${venue.name} — clear the room.`;
+    this.toastTime = 2.4;
+  }
+
+  /** Load one floor of a multi-floor venue and place the player at its entrance. */
+  private loadFloor(venue: Venue, index: number): void {
+    const floor = venue.floors?.[index];
+    if (!floor) return;
+    this.floorIndex = index;
+    this.venueZone = { x: 0, ...floor.zone };
+    this.worldW = floor.worldW;
+    Object.assign(this.goal, floor.goal);
+    this.clearSide();
+    this.player.fireCooldown = 0;
+
+    const layout = floor.layout;
+    for (const [x, w] of layout.ground) this.addGround(x, w);
+    for (const [x, y, w, h, kind, cycle] of layout.platforms ?? []) this.addPlatform(x, y, w, h, kind, cycle);
+    for (const [x, count] of layout.barricades ?? []) this.addBarricade(x, count);
+    for (const [x, y, count] of layout.coinArcs ?? []) this.addCoinArc(x, y, count);
+    if (!this.stashesTaken.includes(venue.key)) {
+      for (const [x, y] of layout.pages ?? []) this.addPage(x, y);
+    }
+    if (!this.venuesCleared.includes(venue.key)) {
+      for (const [x, y, minX, maxX, type] of layout.enemies ?? []) this.addEnemy(x, y, minX, maxX, type);
+    }
+    for (const [x, y, w, h] of layout.hazards ?? []) this.hazards.push({ x, y, w, h });
+
+    this.spawnInVenue(floor.spawnX);
+    this.toast = index === 0
+      ? `${venue.name} — ${floor.hint ?? "clear every floor."}`
+      : `${floor.name}. ${floor.hint ?? ""}`;
+    this.toastTime = 2.4;
+  }
+
+  private spawnInVenue(spawnX: number): void {
+    this.player.x = spawnX;
     this.player.y = 150;
     this.player.vx = 0;
     this.player.vy = 0;
@@ -535,10 +624,22 @@ export class Game {
     this.player.invincible = 1.1;
     this.cameraX = 0;
     this.cameraY = 0;
-    this.toast = venue.weapon === "satcannon"
-      ? "SAT CANNON armed! X/F shoots. Break the token walls."
-      : `${venue.name} — clear the room.`;
-    this.toastTime = 2.4;
+  }
+
+  /** Stairwell goals chain to the next floor; an exit goal ends the visit. */
+  private reachVenueGoal(): void {
+    const level = this.currentLevel();
+    const goalKind = this.goal.kind;
+    if ((goalKind === "up" || goalKind === "down") && level.mode === "overworld" && this.venueKey) {
+      const venue = level.venues[this.venueKey];
+      const current = venue?.floors?.[this.floorIndex];
+      const next = current?.goalTo ?? this.floorIndex + 1;
+      if (venue?.floors?.length && next > this.floorIndex && next < venue.floors.length) {
+        this.loadFloor(venue, next);
+        return;
+      }
+    }
+    this.exitVenue();
   }
 
   private exitVenue(): void {
@@ -547,22 +648,32 @@ export class Game {
     const key = this.venueKey;
     const venue: Venue | undefined = key ? level.venues[key] : undefined;
     const alreadyCleared = key ? this.venuesCleared.includes(key) : true;
-    const clearedNow = !alreadyCleared && this.enemies.length > 0 && this.enemies.every((e) => !e.alive);
+    const multiFloor = !!venue?.floors?.length;
+    const clearedNow =
+      !alreadyCleared && !!key && !!venue &&
+      (multiFloor
+        ? this.visitKills >= this.visitTotal
+        : this.enemies.length > 0 && this.enemies.every((e) => !e.alive));
     if (clearedNow && key && venue) {
       this.venuesCleared.push(key);
       const total = Object.keys(level.venues).length;
       this.toast = this.venuesCleared.length >= total
-        ? "All venues cleared! The vault is open."
-        : `${venue.name} cleared. ${this.venuesCleared.length}/${total} venues.`;
+        ? multiFloor ? "All towers cleared! The Bull is awake." : "All venues cleared! The vault is open."
+        : `${venue.name} cleared. ${this.venuesCleared.length}/${total} ${multiFloor ? "towers" : "venues"}.`;
       this.toastTime = 2.6;
     } else {
-      this.toast = alreadyCleared ? "Back to the streets." : "Shills remain — come back to clear it.";
+      this.toast = alreadyCleared
+        ? "Back to the streets."
+        : multiFloor ? "Agents remain — the building resets."
+        : "Shills remain — come back to clear it.";
       this.toastTime = 2.2;
     }
 
     this.subMode = "overworld";
     this.venueKey = null;
     this.venueZone = null;
+    this.floorIndex = 0;
+    this.visitKills = 0;
     this.clearSide();
     if (this.owReturn) {
       this.owPlayer.x = this.owReturn.tx * TILE + (TILE - OW_PW) / 2;
@@ -574,7 +685,7 @@ export class Game {
   private owSolidAt(tx: number, ty: number): boolean {
     if (tx < 0 || ty < 0 || tx >= this.ow.cols || ty >= this.ow.rows) return true;
     const t = this.ow.grid[ty][tx];
-    return t === "#" || t === "~";
+    return t === "#" || t === "~" || t === "t";
   }
 
   private owMoveAxis(dx: number, dy: number): void {
@@ -599,6 +710,29 @@ export class Game {
   private updateOverworld(dt: number): void {
     const level = this.currentLevel();
     if (level.mode !== "overworld") return;
+    this.owPlayer.invincible = Math.max(0, this.owPlayer.invincible - dt);
+
+    // Taxis cruise fixed routes on a deterministic ping-pong clock — the same
+    // path every run, so contact can be dodged by timing rather than luck.
+    const routes = level.taxis ?? [];
+    for (let i = 0; i < routes.length; i += 1) {
+      const route = routes[i];
+      const taxi = this.ow.taxis[i];
+      if (!taxi) continue;
+      const span = Math.max(1, (route.to - route.from) * TILE);
+      const cycle = span * 2;
+      const m = (((this.time * route.speed + route.phase) % cycle) + cycle) % cycle;
+      const along = m < span ? m : cycle - m;
+      taxi.dir = m < span ? 1 : -1;
+      if (route.axis === "h") {
+        taxi.x = route.from * TILE + along - taxi.w / 2;
+        taxi.y = (route.row ?? 0) * TILE + (TILE - taxi.h) / 2;
+      } else {
+        taxi.x = (route.lane ?? 0) * TILE + (TILE - taxi.w) / 2;
+        taxi.y = route.from * TILE + along - taxi.h / 2;
+      }
+    }
+
     const mx = (Keys.right ? 1 : 0) - (Keys.left ? 1 : 0);
     const my = (Keys.down ? 1 : 0) - (Keys.up ? 1 : 0);
     const len = Math.hypot(mx, my) || 1;
@@ -612,6 +746,25 @@ export class Game {
 
     const cx = this.owPlayer.x + this.owPlayer.w / 2;
     const cy = this.owPlayer.y + this.owPlayer.h / 2;
+
+    for (const taxi of this.ow.taxis) {
+      if (this.owPlayer.invincible > 0 || !overlap(this.owPlayer, taxi)) continue;
+      this.lives -= 1;
+      this.deaths += 1;
+      this.burst(cx, cy, 12);
+      if (this.lives <= 0) {
+        this.gameOver();
+        return;
+      }
+      this.owPlayer.x = level.spawn.tx * TILE + (TILE - OW_PW) / 2;
+      this.owPlayer.y = level.spawn.ty * TILE + (TILE - OW_PH) / 2;
+      this.owPlayer.facing = "down";
+      this.owPlayer.invincible = 1.4;
+      this.toast = "Taxi! Back to the curb.";
+      this.toastTime = 1.6;
+      break;
+    }
+
     const ptx = Math.floor(cx / TILE);
     const pty = Math.floor(cy / TILE);
 
@@ -802,6 +955,7 @@ export class Game {
         this.score += cfg.score;
         this.toast = cfg.stompToast;
         this.toastTime = 1.1;
+        if (this.subMode === "venue") this.visitKills += 1;
         this.burst(enemy.x + enemy.w * 0.5, enemy.y + enemy.h * 0.5, 8);
       } else {
         this.hurtPlayer(false);
@@ -877,6 +1031,7 @@ export class Game {
         this.score += cfg.score;
         this.toast = cfg.stompToast;
         this.toastTime = 1.1;
+        if (this.subMode === "venue") this.visitKills += 1;
         this.burst(enemy.x + enemy.w * 0.5, enemy.y + enemy.h * 0.5, 8);
         break;
       }
@@ -951,6 +1106,16 @@ export class Game {
       return;
     }
     this.burst(this.player.x + this.player.w * 0.5, this.player.y + this.player.h * 0.5, 14);
+    // Dying in a multi-floor building resets the visit, per its clear rule.
+    if (this.subMode === "venue" && this.venueKey) {
+      const level = this.currentLevel();
+      const venue = level.mode === "overworld" ? level.venues[this.venueKey] : undefined;
+      if (venue?.floors?.length) {
+        const key = this.venueKey;
+        this.enterVenue(key);
+        return;
+      }
+    }
     this.resetRun(false);
   }
 
