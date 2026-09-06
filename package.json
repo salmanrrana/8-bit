@@ -17,7 +17,13 @@
     "start": "node ./bin/8bit.js",
     "build": "tsc -p tsconfig.build.json",
     "prepublishOnly": "npm test && npm run build",
-    "test": "node --test src/game.test.ts"
+    "test": "node --test src/game.test.ts",
+    "typecheck": "tsc -p tsconfig.json --pretty false",
+    "lint": "oxlint",
+    "format": "prettier --write",
+    "check:fast": "npm run lint && npm run typecheck && npm test",
+    "check:staged": "node scripts/check-staged.mjs",
+    "prepare": "node scripts/install-hooks.mjs"
   },
   "engines": {
     "node": ">=18"
@@ -29,6 +35,8 @@
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^26.2.0",
+    "oxlint": "^1.79.0",
+    "prettier": "^3.6.2",
     "typescript": "^7.0.2"
   }
 }

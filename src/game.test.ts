@@ -4,8 +4,14 @@ import { Game, overlap } from "./game.ts";
 import { Keys, feedKeys, resetHeld, setTime } from "./input.ts";
 
 test("AABB overlap", () => {
-  assert.equal(overlap({ x: 0, y: 0, w: 10, h: 10 }, { x: 5, y: 5, w: 10, h: 10 }), true);
-  assert.equal(overlap({ x: 0, y: 0, w: 10, h: 10 }, { x: 10, y: 0, w: 10, h: 10 }), false);
+  assert.equal(
+    overlap({ x: 0, y: 0, w: 10, h: 10 }, { x: 5, y: 5, w: 10, h: 10 }),
+    true,
+  );
+  assert.equal(
+    overlap({ x: 0, y: 0, w: 10, h: 10 }, { x: 10, y: 0, w: 10, h: 10 }),
+    false,
+  );
 });
 
 test("level 1 loads and the player lands on the ground", () => {
@@ -61,12 +67,15 @@ test("side-view camera resets when entering a venue", () => {
   assert.equal(game.cameraY, 0);
 });
 
+const frameTimes = new WeakMap<Game, number>();
+
 function frames(game: Game, count: number): void {
-  let t = game.lastNow || 0;
+  let t = frameTimes.get(game) ?? 0;
   for (let i = 0; i < count; i += 1) {
     t += 16.67;
     game.tick(t);
   }
+  frameTimes.set(game, t);
 }
 
 /** Drop the player onto every living enemy from above — a clean stomp each time.
@@ -81,7 +90,7 @@ function stompEverything(game: Game, limit = Infinity): void {
     let spot: number | undefined;
     for (let cx = 8; cx < game.worldW - 24 && spot === undefined; cx += 4) {
       const blocked = game.solids.some(
-        (s) => s.y < enemy.y - 6 && cx + 14 > s.x && cx < s.x + s.w
+        (s) => s.y < enemy.y - 6 && cx + 14 > s.x && cx < s.x + s.w,
       );
       if (!blocked) spot = cx;
     }
@@ -103,10 +112,14 @@ test("level 5 loads as WALL STREET with taxis and four multi-floor venues", () =
   const game = new Game();
   game.levelIndex = 4;
   game.start();
-  assert.equal(game.currentLevel().title, "WALL STREET");
+  const level = game.currentLevel();
+  assert.equal(level.title, "WALL STREET");
+  assert.equal(level.mode, "overworld");
+  if (level.mode !== "overworld")
+    throw new Error("expected an overworld level");
   assert.equal(game.subMode, "overworld");
   assert.equal(game.ow.taxis.length, 3);
-  assert.equal(Object.keys(game.currentLevel().venues).length, 4);
+  assert.equal(Object.keys(level.venues).length, 4);
   assert.equal(game.pageTotal(), 4);
 });
 
