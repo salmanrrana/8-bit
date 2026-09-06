@@ -15,7 +15,7 @@ export const Keys = {
   quitPressed: false,
   selectUp: false,
   selectDown: false,
-  digit: 0
+  digit: 0,
 };
 
 type Button = "left" | "right" | "up" | "down" | "jump" | "fire";
@@ -53,7 +53,7 @@ export function resetHeld(): void {
 export function setTime(ms: number): void {
   nowMs = ms;
   if (!hasKeyUp) {
-    for (const btn of [...held]) {
+    for (const btn of held) {
       const hold = repeating.has(btn) ? REPEAT_HOLD_MS : INITIAL_HOLD_MS;
       if (ms - (lastSeen.get(btn) ?? 0) > hold) {
         if (btn === "jump") Keys.jumpReleased = true;
@@ -111,15 +111,18 @@ function mapChar(ch: string, releasing: boolean): void {
     if (!releasing) pulseSelect("down");
     return releasing ? up("down") : down("down");
   }
-  if (c === " " || c === "z" || c === "k") return releasing ? up("jump") : down("jump");
-  if (c === "x" || c === "f" || c === "j") return releasing ? up("fire") : down("fire");
+  if (c === " " || c === "z" || c === "k")
+    return releasing ? up("jump") : down("jump");
+  if (c === "x" || c === "f" || c === "j")
+    return releasing ? up("fire") : down("fire");
   if (releasing) return;
   if (c === "\r" || c === "\n") Keys.enterPressed = true;
   else if (c === "p") Keys.escPressed = true;
   else if (c === "r") Keys.restartPressed = true;
   else if (c === "m") Keys.menuPressed = true;
   else if (c === "q") Keys.quitPressed = true;
-  else if (c === "1" || c === "2" || c === "3" || c === "4") Keys.digit = Number(c);
+  else if (c === "1" || c === "2" || c === "3" || c === "4")
+    Keys.digit = Number(c);
 }
 
 function mapArrow(code: string, releasing: boolean): void {

@@ -7,7 +7,7 @@ export function hexRgb(hex: string): Rgb {
   return {
     r: parseInt(h.slice(0, 2), 16),
     g: parseInt(h.slice(2, 4), 16),
-    b: parseInt(h.slice(4, 6), 16)
+    b: parseInt(h.slice(4, 6), 16),
   };
 }
 
@@ -31,10 +31,10 @@ export class Screen {
     this.cols = Math.max(40, cols);
     this.rows = Math.max(16, rows);
     const n = this.cols * this.rows;
-    this.ch = new Array(n).fill(" ");
+    this.ch = Array.from({ length: n }, () => " ");
     this.fg = new Uint32Array(n);
     this.bg = new Uint32Array(n);
-    this.prevCh = new Array(n).fill("");
+    this.prevCh = Array.from({ length: n }, () => "");
     this.prevFg = new Uint32Array(n);
     this.prevBg = new Uint32Array(n);
   }
@@ -46,10 +46,10 @@ export class Screen {
     this.cols = nextCols;
     this.rows = nextRows;
     const n = nextCols * nextRows;
-    this.ch = new Array(n).fill(" ");
+    this.ch = Array.from({ length: n }, () => " ");
     this.fg = new Uint32Array(n);
     this.bg = new Uint32Array(n);
-    this.prevCh = new Array(n).fill("");
+    this.prevCh = Array.from({ length: n }, () => "");
     this.prevFg = new Uint32Array(n);
     this.prevBg = new Uint32Array(n);
     this.first = true;
@@ -82,7 +82,15 @@ export class Screen {
     this.bg[i] = bg;
   }
 
-  fill(x: number, y: number, w: number, h: number, glyph: string, fg: Rgb, bg: Rgb): void {
+  fill(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    glyph: string,
+    fg: Rgb,
+    bg: Rgb,
+  ): void {
     const x0 = Math.max(0, x | 0);
     const y0 = Math.max(0, y | 0);
     const x1 = Math.min(this.cols, x + w);
@@ -102,7 +110,8 @@ export class Screen {
   }
 
   write(x: number, y: number, text: string, fg: Rgb, bg: Rgb): void {
-    for (let i = 0; i < text.length; i += 1) this.put(x + i, y, text[i], fg, bg);
+    for (let i = 0; i < text.length; i += 1)
+      this.put(x + i, y, text[i], fg, bg);
   }
 
   /** Draw a glyph without punching a background rectangle through the sky. */
@@ -135,7 +144,11 @@ export class Screen {
         const glyph = this.ch[i];
         const fg = this.fg[i];
         const bg = this.bg[i];
-        if (this.prevCh[i] === glyph && this.prevFg[i] === fg && this.prevBg[i] === bg) {
+        if (
+          this.prevCh[i] === glyph &&
+          this.prevFg[i] === fg &&
+          this.prevBg[i] === bg
+        ) {
           pendingX = -1;
           continue;
         }
