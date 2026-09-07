@@ -100,7 +100,12 @@ function luminance(c: number): number {
   return 0.3 * (c >> 16) + 0.6 * ((c >> 8) & 255) + 0.1 * (c & 255);
 }
 
-export function drawGame(screen: Screen, game: Game, scale: Scale): void {
+export function drawGame(
+  screen: Screen,
+  game: Game,
+  scale: Scale,
+  drawArcadeImage?: () => void,
+): void {
   const zone = game.activeZone();
   const sky = packHex(zone.sky);
   const sky2 = packHex(zone.sky2);
@@ -117,13 +122,17 @@ export function drawGame(screen: Screen, game: Game, scale: Scale): void {
 
   let arcadeCanvas: ArcadeCanvas | undefined;
   if (game.subMode === "brawler" && game.brawler) {
-    arcadeCanvas = new ArcadeCanvas(fb);
-    createArt(arcadeCanvas).draw(game.brawler.state);
+    if (drawArcadeImage) drawArcadeImage();
+    else {
+      arcadeCanvas = new ArcadeCanvas(fb);
+      createArt(arcadeCanvas).draw(game.brawler.state);
+    }
   } else if (game.subMode === "overworld")
     drawOverworld(game, scale, sky, sky2, accent);
   else drawSide(game, scale, sky, sky2, ground, accent);
 
-  fb.blit(screen, scale.playX, scale.playY);
+  if (!(drawArcadeImage && game.subMode === "brawler"))
+    fb.blit(screen, scale.playX, scale.playY);
   arcadeCanvas?.blitLabels(screen, scale.playX, scale.playY);
 
   if (game.subMode === "brawler" && game.brawler)

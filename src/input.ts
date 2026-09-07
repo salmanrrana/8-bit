@@ -197,7 +197,11 @@ function applyKitty(code: number, eventType: number): void {
   if (code >= 1 && code <= 127) mapChar(String.fromCharCode(code), releasing);
 }
 
-export function feedKeys(chunk: string, pending: string): string {
+export function feedKeys(
+  chunk: string,
+  pending: string,
+  terminalResponse?: (response: string) => void,
+): string {
   const data = pending + chunk;
   let i = 0;
   while (i < data.length) {
@@ -209,6 +213,13 @@ export function feedKeys(chunk: string, pending: string): string {
     }
     if (c === "\x1b") {
       if (i + 1 >= data.length) return data.slice(i);
+      if (data[i + 1] === "_") {
+        const end = data.indexOf("\x1b\\", i + 2);
+        if (end < 0) return data.slice(i);
+        terminalResponse?.(data.slice(i, end + 2));
+        i = end + 2;
+        continue;
+      }
       if (data[i + 1] !== "[") {
         Keys.escPressed = true;
         i += 1;
@@ -218,7 +229,9 @@ export function feedKeys(chunk: string, pending: string): string {
       if (end < 0) return data.slice(i);
       const body = data.slice(i + 2, end);
       const final = data[end];
-      parseCsi(body, final);
+      if (final === "t" || final === "c")
+        terminalResponse?.(data.slice(i, end + 1));
+      else parseCsi(body, final);
       i = end + 1;
       continue;
     }
