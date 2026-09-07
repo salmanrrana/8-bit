@@ -9,5 +9,5 @@
     "sourceMap": false
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "src/game.test.ts"]
+  "exclude": ["node_modules", "src/**/*.test.ts"]
 }

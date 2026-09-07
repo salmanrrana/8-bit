@@ -28,7 +28,8 @@ export type ConfirmCycle = {
   onMs: number;
 };
 
-export type Theme = "city" | "network" | "tour" | "mania" | "wallstreet";
+export type Theme =
+  "city" | "network" | "tour" | "mania" | "wallstreet" | "brawler";
 
 export type GoalKind = "up" | "down" | "exit";
 
@@ -70,12 +71,21 @@ export type Layout = {
   ground: Array<[x: number, w: number]>;
   platforms: Array<
     | [x: number, y: number, w: number, h: number, kind: PlatformKind]
-    | [x: number, y: number, w: number, h: number, kind: PlatformKind, cycle: ConfirmCycle]
+    | [
+        x: number,
+        y: number,
+        w: number,
+        h: number,
+        kind: PlatformKind,
+        cycle: ConfirmCycle,
+      ]
   >;
   blockStacks?: Array<[x: number, count: number]>;
   coinArcs: Array<[x: number, y: number, count: number]>;
   pages: Array<[x: number, y: number]>;
-  enemies: Array<[x: number, y: number, minX: number, maxX: number, type: EnemyType]>;
+  enemies: Array<
+    [x: number, y: number, minX: number, maxX: number, type: EnemyType]
+  >;
   hazards: Array<[x: number, y: number, w: number, h: number]>;
   checkpoints?: CheckpointDef[];
   allies?: AllyDef[];
@@ -160,8 +170,18 @@ export type OverworldLevel = {
   venues: Record<string, Venue>;
 };
 
-export type Level = SideLevel | OverworldLevel;
+export type BrawlerLevel = {
+  id: string;
+  title: string;
+  description: string;
+  theme: "brawler";
+  mode: "brawler";
+  labels: Labels;
+  worldW: number;
+};
+
+export type Level = SideLevel | OverworldLevel | BrawlerLevel;
 
 export type Phase = "title" | "playing" | "paused" | "complete" | "gameover";
 
-export type SubMode = "side" | "overworld" | "venue";
+export type SubMode = "side" | "overworld" | "venue" | "brawler";

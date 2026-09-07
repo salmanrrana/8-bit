@@ -8,6 +8,12 @@ export const Keys = {
   jumpReleased: false,
   fire: false,
   firePressed: false,
+  throw: false,
+  throwPressed: false,
+  special: false,
+  specialPressed: false,
+  fighterPrevious: false,
+  fighterNext: false,
   enterPressed: false,
   escPressed: false,
   restartPressed: false,
@@ -18,7 +24,8 @@ export const Keys = {
   digit: 0,
 };
 
-type Button = "left" | "right" | "up" | "down" | "jump" | "fire";
+type Button =
+  "left" | "right" | "up" | "down" | "jump" | "fire" | "throw" | "special";
 
 const held = new Set<Button>();
 const lastSeen = new Map<Button, number>();
@@ -33,6 +40,10 @@ export function consumeEdges(): void {
   Keys.jumpPressed = false;
   Keys.jumpReleased = false;
   Keys.firePressed = false;
+  Keys.throwPressed = false;
+  Keys.specialPressed = false;
+  Keys.fighterPrevious = false;
+  Keys.fighterNext = false;
   Keys.enterPressed = false;
   Keys.escPressed = false;
   Keys.restartPressed = false;
@@ -72,12 +83,23 @@ function sync(): void {
   Keys.down = held.has("down");
   Keys.jump = held.has("jump");
   Keys.fire = held.has("fire");
+  Keys.throw = held.has("throw");
+  Keys.special = held.has("special");
 }
 
 function down(btn: Button): void {
+  // Legacy terminals cannot distinguish quick taps from OS repeat bytes.
+  // Treat each byte for a discrete action as a press; otherwise a quick
+  // grab-then-throw is swallowed by the movement key's 420 ms hold window.
+  if (!hasKeyUp) {
+    if (btn === "throw") Keys.throwPressed = true;
+    if (btn === "special") Keys.specialPressed = true;
+  }
   if (!held.has(btn)) {
     if (btn === "jump") Keys.jumpPressed = true;
     if (btn === "fire") Keys.firePressed = true;
+    if (btn === "throw") Keys.throwPressed = true;
+    if (btn === "special") Keys.specialPressed = true;
   } else {
     repeating.add(btn);
   }
@@ -115,14 +137,17 @@ function mapChar(ch: string, releasing: boolean): void {
     return releasing ? up("jump") : down("jump");
   if (c === "x" || c === "f" || c === "j")
     return releasing ? up("fire") : down("fire");
+  if (c === "e") return releasing ? up("throw") : down("throw");
+  if (c === "c") return releasing ? up("special") : down("special");
   if (releasing) return;
   if (c === "\r" || c === "\n") Keys.enterPressed = true;
   else if (c === "p") Keys.escPressed = true;
   else if (c === "r") Keys.restartPressed = true;
   else if (c === "m") Keys.menuPressed = true;
   else if (c === "q") Keys.quitPressed = true;
-  else if (c === "1" || c === "2" || c === "3" || c === "4")
-    Keys.digit = Number(c);
+  else if (c === "[") Keys.fighterPrevious = true;
+  else if (c === "]") Keys.fighterNext = true;
+  else if (c >= "1" && c <= "9") Keys.digit = Number(c);
 }
 
 function mapArrow(code: string, releasing: boolean): void {

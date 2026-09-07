@@ -1,3 +1,9 @@
+import {
+  create as createBrawler,
+  STAGES,
+  type Brawler,
+  type CharacterId,
+} from "./brawler.ts";
 import { Keys } from "./input.ts";
 import { LEVELS } from "./levels.ts";
 import type {
@@ -12,7 +18,7 @@ import type {
   PlatformKind,
   SubMode,
   Venue,
-  Zone
+  Zone,
 } from "./types.ts";
 
 export const VIEW_H = 240;
@@ -43,23 +49,60 @@ const FIRE_COOLDOWN = 0.35;
 const TAXI_W_H = 24;
 const TAXI_H_V = 13;
 
-export const ENEMY_TYPES: Record<EnemyType, { speed: number; score: number; stompToast: string; glyph: string }> = {
+export const ENEMY_TYPES: Record<
+  EnemyType,
+  { speed: number; score: number; stompToast: string; glyph: string }
+> = {
   banker: { speed: 28, score: 200, stompToast: "Threat cleared.", glyph: "B" },
   printer: { speed: 28, score: 200, stompToast: "Printer jammed.", glyph: "$" },
   miner: { speed: 36, score: 350, stompToast: "Threat cleared.", glyph: "m" },
   fud: { speed: 30, score: 200, stompToast: "FUD debunked.", glyph: "F" },
-  chargeback: { speed: 26, score: 200, stompToast: "Reversal blocked.", glyph: "C" },
-  exploit: { speed: 40, score: 350, stompToast: "Exploit patched.", glyph: "e" },
+  chargeback: {
+    speed: 26,
+    score: 200,
+    stompToast: "Reversal blocked.",
+    glyph: "C",
+  },
+  exploit: {
+    speed: 40,
+    score: 350,
+    stompToast: "Exploit patched.",
+    glyph: "e",
+  },
   suit: { speed: 30, score: 200, stompToast: "Lobbyist bounced.", glyph: "U" },
   agent: { speed: 26, score: 200, stompToast: "Tail shaken.", glyph: "A" },
-  wiretap: { speed: 44, score: 350, stompToast: "Wiretap crushed.", glyph: "w" },
+  wiretap: {
+    speed: 44,
+    score: 350,
+    stompToast: "Wiretap crushed.",
+    glyph: "w",
+  },
   shiller: { speed: 32, score: 200, stompToast: "Shill silenced.", glyph: "S" },
-  rugpull: { speed: 26, score: 200, stompToast: "Rug pinned down.", glyph: "R" },
-  degen: { speed: 42, score: 350, stompToast: "Position liquidated.", glyph: "D" },
-  shitgun: { speed: 0, score: 400, stompToast: "Shooter scrapped.", glyph: "T" }
+  rugpull: {
+    speed: 26,
+    score: 200,
+    stompToast: "Rug pinned down.",
+    glyph: "R",
+  },
+  degen: {
+    speed: 42,
+    score: 350,
+    stompToast: "Position liquidated.",
+    glyph: "D",
+  },
+  shitgun: {
+    speed: 0,
+    score: 400,
+    stompToast: "Shooter scrapped.",
+    glyph: "T",
+  },
 };
 
-export type Solid = Box & { kind: PlatformKind; hit: boolean; cycle: ConfirmCycle | null };
+export type Solid = Box & {
+  kind: PlatformKind;
+  hit: boolean;
+  cycle: ConfirmCycle | null;
+};
 export type Pickup = Box & { taken: boolean };
 export type Enemy = Box & {
   vx: number;
@@ -71,10 +114,23 @@ export type Enemy = Box & {
   fireTimer: number;
 };
 export type Shot = { alive: boolean; x: number; y: number; vx: number };
-export type Particle = { alive: boolean; x: number; y: number; vx: number; vy: number; life: number };
+export type Particle = {
+  alive: boolean;
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+};
 export type Ally = AllyDef & { greeted: boolean };
 export type Barricade = Box & { hp: number; solid: Solid };
-export type Checkpoint = { x: number; y: number; index: number; name: string; taken: boolean };
+export type Checkpoint = {
+  x: number;
+  y: number;
+  index: number;
+  name: string;
+  taken: boolean;
+};
 
 export type Player = {
   x: number;
@@ -116,7 +172,9 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 export function overlap(a: Box, b: Box): boolean {
-  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+  return (
+    a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y
+  );
 }
 
 function enemyConfig(type: EnemyType) {
@@ -128,6 +186,8 @@ export class Game {
   paused = false;
   levelIndex = 0;
   subMode: SubMode = "side";
+  brawler: Brawler | null = null;
+  selectedFighter: CharacterId = "jack";
   venueKey: string | null = null;
   venuesCleared: string[] = [];
   stashesTaken: string[] = [];
@@ -160,11 +220,27 @@ export class Game {
   goal: Box & { kind?: GoalKind } = { x: 0, y: 0, w: 0, h: 0 };
 
   player: Player = {
-    x: 32, y: 160, w: 14, h: 24, vx: 0, vy: 0, facing: 1,
-    onGround: false, coyote: 0, jumpBuffer: 0, invincible: 0, fireCooldown: 0
+    x: 32,
+    y: 160,
+    w: 14,
+    h: 24,
+    vx: 0,
+    vy: 0,
+    facing: 1,
+    onGround: false,
+    coyote: 0,
+    jumpBuffer: 0,
+    invincible: 0,
+    fireCooldown: 0,
   };
   owPlayer: OwPlayer = {
-    x: 0, y: 0, w: OW_PW, h: OW_PH, facing: "down", moving: false, invincible: 0
+    x: 0,
+    y: 0,
+    w: OW_PW,
+    h: OW_PH,
+    facing: "down",
+    moving: false,
+    invincible: 0,
   };
 
   solids: Solid[] = [];
@@ -175,10 +251,25 @@ export class Game {
   checkpoints: Checkpoint[] = [];
   allies: Ally[] = [];
   barricades: Barricade[] = [];
-  shots: Shot[] = Array.from({ length: 12 }, () => ({ alive: false, x: 0, y: 0, vx: 0 }));
-  satShots: Shot[] = Array.from({ length: 6 }, () => ({ alive: false, x: 0, y: 0, vx: 0 }));
+  shots: Shot[] = Array.from({ length: 12 }, () => ({
+    alive: false,
+    x: 0,
+    y: 0,
+    vx: 0,
+  }));
+  satShots: Shot[] = Array.from({ length: 6 }, () => ({
+    alive: false,
+    x: 0,
+    y: 0,
+    vx: 0,
+  }));
   particles: Particle[] = Array.from({ length: 48 }, () => ({
-    alive: false, x: 0, y: 0, vx: 0, vy: 0, life: 0
+    alive: false,
+    x: 0,
+    y: 0,
+    vx: 0,
+    vy: 0,
+    life: 0,
   }));
 
   ow = {
@@ -188,10 +279,23 @@ export class Game {
     coins: [] as Array<{ tx: number; ty: number; taken: boolean }>,
     doors: [] as Array<{ tx: number; ty: number; key: string }>,
     exit: null as { tx: number; ty: number } | null,
-    npcs: [] as Array<{ kind: string; tx: number; ty: number; name: string; lines: string[]; greeted: boolean }>,
-    taxis: [] as Taxi[]
+    npcs: [] as Array<{
+      kind: string;
+      tx: number;
+      ty: number;
+      name: string;
+      lines: string[];
+      greeted: boolean;
+    }>,
+    taxis: [] as Taxi[],
   };
 
+  private brawlerEdges = {
+    jumpPressed: false,
+    firePressed: false,
+    throwPressed: false,
+    specialPressed: false,
+  };
   private accumulator = 0;
   private lastNow = 0;
 
@@ -216,11 +320,15 @@ export class Game {
 
   pageTotal(): number {
     const level = this.currentLevel();
+    if (level.mode === "brawler") return STAGES.length;
     if (level.mode === "overworld") {
       let sum = 0;
       for (const venue of Object.values(level.venues)) {
         if (venue.floors?.length) {
-          sum += venue.floors.reduce((acc, floor) => acc + (floor.layout.pages?.length ?? 0), 0);
+          sum += venue.floors.reduce(
+            (acc, floor) => acc + (floor.layout.pages?.length ?? 0),
+            0,
+          );
         } else {
           sum += venue.layout.pages?.length ?? 0;
         }
@@ -246,15 +354,32 @@ export class Game {
   isConfirmed(solid: Solid): boolean {
     const cycle = solid.cycle;
     if (!cycle || !(cycle.periodMs > 0) || !(cycle.onMs > 0)) return true;
-    return ((this.time * 1000 + (cycle.phaseMs || 0)) % cycle.periodMs) < cycle.onMs;
+    return (
+      (this.time * 1000 + (cycle.phaseMs || 0)) % cycle.periodMs < cycle.onMs
+    );
   }
 
   handleUi(): "quit" | null {
     if (Keys.quitPressed && this.phase === "title") return "quit";
     if (this.phase === "title") {
-      if (Keys.selectUp) this.levelIndex = (this.levelIndex + LEVELS.length - 1) % LEVELS.length;
-      if (Keys.selectDown) this.levelIndex = (this.levelIndex + 1) % LEVELS.length;
-      if (Keys.digit >= 1 && Keys.digit <= LEVELS.length) this.levelIndex = Keys.digit - 1;
+      if (Keys.selectUp)
+        this.levelIndex = (this.levelIndex + LEVELS.length - 1) % LEVELS.length;
+      if (Keys.selectDown)
+        this.levelIndex = (this.levelIndex + 1) % LEVELS.length;
+      if (Keys.digit >= 1 && Keys.digit <= LEVELS.length)
+        this.levelIndex = Keys.digit - 1;
+      if (
+        this.currentLevel().mode === "brawler" &&
+        (Keys.fighterPrevious || Keys.fighterNext)
+      ) {
+        const fighters: CharacterId[] = ["jack", "satoshi", "wizard", "coder"];
+        const index = fighters.indexOf(this.selectedFighter);
+        this.selectedFighter =
+          fighters[
+            (index + (Keys.fighterNext ? 1 : -1) + fighters.length) %
+              fighters.length
+          ];
+      }
       if (Keys.enterPressed || Keys.jumpPressed) this.start();
       return null;
     }
@@ -266,7 +391,8 @@ export class Game {
       return null;
     }
     if (this.phase === "complete" || this.phase === "gameover") {
-      if (Keys.enterPressed || Keys.restartPressed || Keys.jumpPressed) this.start();
+      if (Keys.enterPressed || Keys.restartPressed || Keys.jumpPressed)
+        this.start();
       else if (Keys.menuPressed || Keys.escPressed) this.toTitle();
       else if (Keys.quitPressed) return "quit";
       return null;
@@ -281,8 +407,16 @@ export class Game {
     this.paused = false;
     this.lastNow = 0;
     this.accumulator = 0;
+    this.brawlerEdges = {
+      jumpPressed: false,
+      firePressed: false,
+      throwPressed: false,
+      specialPressed: false,
+    };
     Keys.jumpPressed = false;
     Keys.firePressed = false;
+    Keys.throwPressed = false;
+    Keys.specialPressed = false;
     this.resetRun(true);
   }
 
@@ -307,6 +441,12 @@ export class Game {
   }
 
   tick(now: number): void {
+    if (this.phase === "playing" && this.subMode === "brawler") {
+      this.brawlerEdges.jumpPressed ||= Keys.jumpPressed;
+      this.brawlerEdges.firePressed ||= Keys.firePressed;
+      this.brawlerEdges.throwPressed ||= Keys.throwPressed;
+      this.brawlerEdges.specialPressed ||= Keys.specialPressed;
+    }
     if (!this.lastNow) this.lastNow = now;
     const dt = Math.min((now - this.lastNow) / 1000, MAX_FRAME);
     this.lastNow = now;
@@ -325,6 +465,16 @@ export class Game {
     if (this.toastTime <= 0 && this.toastQueue.length > 0) {
       this.toast = this.toastQueue.shift() ?? "";
       this.toastTime = 2.4;
+    }
+    if (this.subMode === "brawler" && this.brawler) {
+      this.brawler.update(dt, { ...Keys, ...this.brawlerEdges });
+      this.brawlerEdges = {
+        jumpPressed: false,
+        firePressed: false,
+        throwPressed: false,
+        specialPressed: false,
+      };
+      return;
     }
     this.player.invincible = Math.max(0, this.player.invincible - dt);
 
@@ -351,7 +501,11 @@ export class Game {
       this.completeGame();
     }
 
-    this.cameraX = clamp(this.player.x - this.viewW * 0.37, 0, Math.max(0, this.worldW - this.viewW));
+    this.cameraX = clamp(
+      this.player.x - this.viewW * 0.37,
+      0,
+      Math.max(0, this.worldW - this.viewW),
+    );
     this.cameraY = 0;
   }
 
@@ -387,18 +541,50 @@ export class Game {
     this.player.jumpBuffer = 0;
     this.player.invincible = 1.1;
     this.player.fireCooldown = 0;
-    if (this.subMode !== "overworld") this.cameraX = Math.max(0, this.player.x - 80);
+    if (this.subMode !== "overworld")
+      this.cameraX = Math.max(0, this.player.x - 80);
     if (full) this.toastQueue = [];
     this.toast = full
-      ? (this.isOverworldLevel()
+      ? this.isOverworldLevel()
         ? "Walk the city. Enter every venue. Ignore the shills."
-        : `Run, jump, collect ${this.levelLabel("coin", "BTC")}.`)
+        : `Run, jump, collect ${this.levelLabel("coin", "BTC")}.`
       : "Back to checkpoint.";
     this.toastTime = 2.2;
   }
 
   private initLevel(): void {
     const level = this.currentLevel();
+    this.brawler = null;
+    if (level.mode === "brawler") {
+      this.subMode = "brawler";
+      this.worldW = level.worldW;
+      this.venueKey = null;
+      this.zones = [];
+      this.clearSide();
+      this.brawler = createBrawler(
+        {
+          reward: (sats, score) => {
+            this.coins += sats;
+            this.score += score;
+          },
+          checkpoint: () => {
+            this.pages += 1;
+          },
+          death: () => {
+            this.lives -= 1;
+            this.deaths += 1;
+            if (this.lives <= 0) {
+              this.gameOver();
+              return false;
+            }
+            return true;
+          },
+          complete: () => this.completeGame(),
+        },
+        this.selectedFighter,
+      );
+      return;
+    }
     if (level.mode === "overworld") {
       this.subMode = "overworld";
       this.venueKey = null;
@@ -421,13 +607,18 @@ export class Game {
     this.clearSide();
     const layout = level.layout;
     for (const [x, w] of layout.ground) this.addGround(x, w);
-    for (const [x, y, w, h, kind, cycle] of layout.platforms) this.addPlatform(x, y, w, h, kind, cycle);
-    for (const [x, count] of layout.blockStacks ?? []) this.addBlockStack(x, count);
+    for (const [x, y, w, h, kind, cycle] of layout.platforms)
+      this.addPlatform(x, y, w, h, kind, cycle);
+    for (const [x, count] of layout.blockStacks ?? [])
+      this.addBlockStack(x, count);
     for (const [x, y, count] of layout.coinArcs) this.addCoinArc(x, y, count);
     for (const [x, y] of layout.pages) this.addPage(x, y);
-    for (const [x, y, minX, maxX, type] of layout.enemies) this.addEnemy(x, y, minX, maxX, type);
-    for (const [x, y, w, h] of layout.hazards) this.hazards.push({ x, y, w, h });
-    for (const cp of layout.checkpoints ?? []) this.checkpoints.push({ ...cp, taken: false });
+    for (const [x, y, minX, maxX, type] of layout.enemies)
+      this.addEnemy(x, y, minX, maxX, type);
+    for (const [x, y, w, h] of layout.hazards)
+      this.hazards.push({ x, y, w, h });
+    for (const cp of layout.checkpoints ?? [])
+      this.checkpoints.push({ ...cp, taken: false });
     for (const ally of layout.allies ?? []) this.addAlly(ally);
   }
 
@@ -454,16 +645,20 @@ export class Game {
     this.ow.exit = null;
     this.ow.npcs = [];
     this.ow.taxis = (level.taxis ?? []).map((route) => ({
-      x: 0, y: 0, w: route.axis === "h" ? TAXI_W_H : TAXI_H_V,
+      x: 0,
+      y: 0,
+      w: route.axis === "h" ? TAXI_W_H : TAXI_H_V,
       h: route.axis === "h" ? TAXI_H_V : TAXI_W_H,
-      axis: route.axis, dir: 1
+      axis: route.axis,
+      dir: 1,
     }));
 
     for (let ty = 0; ty < this.ow.rows; ty += 1) {
       for (let tx = 0; tx < this.ow.cols; tx += 1) {
         const t = this.ow.grid[ty][tx];
         if (t === "c") this.ow.coins.push({ tx, ty, taken: false });
-        else if (t >= "1" && t <= "9" && level.venues[t]) this.ow.doors.push({ tx, ty, key: t });
+        else if (t >= "1" && t <= "9" && level.venues[t])
+          this.ow.doors.push({ tx, ty, key: t });
         else if (t === "X") this.ow.exit = { tx, ty };
       }
     }
@@ -476,21 +671,52 @@ export class Game {
     this.owPlayer.invincible = 0;
     const mapW = this.ow.cols * TILE;
     const mapH = this.ow.rows * TILE;
-    this.cameraX = clamp(this.owPlayer.x - this.viewW / 2, 0, Math.max(0, mapW - this.viewW));
-    this.cameraY = clamp(this.owPlayer.y - VIEW_H / 2, 0, Math.max(0, mapH - VIEW_H));
+    this.cameraX = clamp(
+      this.owPlayer.x - this.viewW / 2,
+      0,
+      Math.max(0, mapW - this.viewW),
+    );
+    this.cameraY = clamp(
+      this.owPlayer.y - VIEW_H / 2,
+      0,
+      Math.max(0, mapH - VIEW_H),
+    );
   }
 
   private addGround(x: number, w: number): void {
-    this.solids.push({ x, y: 204, w, h: 36, kind: "ground", hit: false, cycle: null });
+    this.solids.push({
+      x,
+      y: 204,
+      w,
+      h: 36,
+      kind: "ground",
+      hit: false,
+      cycle: null,
+    });
   }
 
-  private addPlatform(x: number, y: number, w: number, h: number, kind: PlatformKind, cycle?: ConfirmCycle): void {
+  private addPlatform(
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    kind: PlatformKind,
+    cycle?: ConfirmCycle,
+  ): void {
     this.solids.push({ x, y, w, h, kind, hit: false, cycle: cycle ?? null });
   }
 
   private addBlockStack(x: number, count: number): void {
     for (let i = 0; i < count; i += 1) {
-      this.solids.push({ x, y: 188 - i * TILE, w: TILE, h: TILE, kind: "block", hit: false, cycle: null });
+      this.solids.push({
+        x,
+        y: 188 - i * TILE,
+        w: TILE,
+        h: TILE,
+        kind: "block",
+        hit: false,
+        cycle: null,
+      });
     }
   }
 
@@ -499,7 +725,9 @@ export class Game {
       this.coinsList.push({
         x: x + i * 22,
         y: y - Math.abs(i - Math.floor(count / 2)) * 8,
-        w: 8, h: 8, taken: false
+        w: 8,
+        h: 8,
+        taken: false,
       });
     }
   }
@@ -508,10 +736,25 @@ export class Game {
     this.pagesList.push({ x, y, w: 11, h: 14, taken: false });
   }
 
-  private addEnemy(x: number, y: number, minX: number, maxX: number, type: EnemyType): void {
+  private addEnemy(
+    x: number,
+    y: number,
+    minX: number,
+    maxX: number,
+    type: EnemyType,
+  ): void {
     this.enemies.push({
-      x, y, w: 16, h: 18, vx: enemyConfig(type).speed, minX, maxX, type,
-      alive: true, squashed: 0, fireTimer: (x % 100) / 100 * SHITGUN_PERIOD
+      x,
+      y,
+      w: 16,
+      h: 18,
+      vx: enemyConfig(type).speed,
+      minX,
+      maxX,
+      type,
+      alive: true,
+      squashed: 0,
+      fireTimer: ((x % 100) / 100) * SHITGUN_PERIOD,
     });
   }
 
@@ -521,13 +764,21 @@ export class Game {
       w: spec.w ?? 18,
       h: spec.h ?? 22,
       triggerX: typeof spec.triggerX === "number" ? spec.triggerX : spec.x,
-      greeted: false
+      greeted: false,
     });
   }
 
   private addBarricade(x: number, count: number): void {
     const h = count * TILE;
-    const solid: Solid = { x, y: 204 - h, w: TILE, h, kind: "barricade", hit: false, cycle: null };
+    const solid: Solid = {
+      x,
+      y: 204 - h,
+      w: TILE,
+      h,
+      kind: "barricade",
+      hit: false,
+      cycle: null,
+    };
     this.solids.push(solid);
     this.barricades.push({ x, y: 204 - h, w: TILE, h, hp: 3, solid });
   }
@@ -547,7 +798,10 @@ export class Game {
     // resets it, so visitKills must reach the venue total in one go.
     if (venue.floors?.length) {
       this.visitKills = 0;
-      this.visitTotal = venue.floors.reduce((sum, floor) => sum + floor.layout.enemies.length, 0);
+      this.visitTotal = venue.floors.reduce(
+        (sum, floor) => sum + floor.layout.enemies.length,
+        0,
+      );
       this.loadFloor(venue, 0);
       return;
     }
@@ -563,21 +817,27 @@ export class Game {
 
     const layout = venue.layout;
     for (const [x, w] of layout.ground) this.addGround(x, w);
-    for (const [x, y, w, h, kind, cycle] of layout.platforms ?? []) this.addPlatform(x, y, w, h, kind, cycle);
-    for (const [x, count] of layout.barricades ?? []) this.addBarricade(x, count);
-    for (const [x, y, count] of layout.coinArcs ?? []) this.addCoinArc(x, y, count);
+    for (const [x, y, w, h, kind, cycle] of layout.platforms ?? [])
+      this.addPlatform(x, y, w, h, kind, cycle);
+    for (const [x, count] of layout.barricades ?? [])
+      this.addBarricade(x, count);
+    for (const [x, y, count] of layout.coinArcs ?? [])
+      this.addCoinArc(x, y, count);
     if (!this.stashesTaken.includes(key)) {
       for (const [x, y] of layout.pages ?? []) this.addPage(x, y);
     }
     if (!this.venuesCleared.includes(key)) {
-      for (const [x, y, minX, maxX, type] of layout.enemies ?? []) this.addEnemy(x, y, minX, maxX, type);
+      for (const [x, y, minX, maxX, type] of layout.enemies ?? [])
+        this.addEnemy(x, y, minX, maxX, type);
     }
-    for (const [x, y, w, h] of layout.hazards ?? []) this.hazards.push({ x, y, w, h });
+    for (const [x, y, w, h] of layout.hazards ?? [])
+      this.hazards.push({ x, y, w, h });
 
     this.spawnInVenue(venue.spawnX);
-    this.toast = venue.weapon === "satcannon"
-      ? "SAT CANNON armed! X/F shoots. Break the token walls."
-      : `${venue.name} — clear the room.`;
+    this.toast =
+      venue.weapon === "satcannon"
+        ? "SAT CANNON armed! X/F shoots. Break the token walls."
+        : `${venue.name} — clear the room.`;
     this.toastTime = 2.4;
   }
 
@@ -594,21 +854,27 @@ export class Game {
 
     const layout = floor.layout;
     for (const [x, w] of layout.ground) this.addGround(x, w);
-    for (const [x, y, w, h, kind, cycle] of layout.platforms ?? []) this.addPlatform(x, y, w, h, kind, cycle);
-    for (const [x, count] of layout.barricades ?? []) this.addBarricade(x, count);
-    for (const [x, y, count] of layout.coinArcs ?? []) this.addCoinArc(x, y, count);
+    for (const [x, y, w, h, kind, cycle] of layout.platforms ?? [])
+      this.addPlatform(x, y, w, h, kind, cycle);
+    for (const [x, count] of layout.barricades ?? [])
+      this.addBarricade(x, count);
+    for (const [x, y, count] of layout.coinArcs ?? [])
+      this.addCoinArc(x, y, count);
     if (!this.stashesTaken.includes(venue.key)) {
       for (const [x, y] of layout.pages ?? []) this.addPage(x, y);
     }
     if (!this.venuesCleared.includes(venue.key)) {
-      for (const [x, y, minX, maxX, type] of layout.enemies ?? []) this.addEnemy(x, y, minX, maxX, type);
+      for (const [x, y, minX, maxX, type] of layout.enemies ?? [])
+        this.addEnemy(x, y, minX, maxX, type);
     }
-    for (const [x, y, w, h] of layout.hazards ?? []) this.hazards.push({ x, y, w, h });
+    for (const [x, y, w, h] of layout.hazards ?? [])
+      this.hazards.push({ x, y, w, h });
 
     this.spawnInVenue(floor.spawnX);
-    this.toast = index === 0
-      ? `${venue.name} — ${floor.hint ?? "clear every floor."}`
-      : `${floor.name}. ${floor.hint ?? ""}`;
+    this.toast =
+      index === 0
+        ? `${venue.name} — ${floor.hint ?? "clear every floor."}`
+        : `${floor.name}. ${floor.hint ?? ""}`;
     this.toastTime = 2.4;
   }
 
@@ -630,11 +896,19 @@ export class Game {
   private reachVenueGoal(): void {
     const level = this.currentLevel();
     const goalKind = this.goal.kind;
-    if ((goalKind === "up" || goalKind === "down") && level.mode === "overworld" && this.venueKey) {
+    if (
+      (goalKind === "up" || goalKind === "down") &&
+      level.mode === "overworld" &&
+      this.venueKey
+    ) {
       const venue = level.venues[this.venueKey];
       const current = venue?.floors?.[this.floorIndex];
       const next = current?.goalTo ?? this.floorIndex + 1;
-      if (venue?.floors?.length && next > this.floorIndex && next < venue.floors.length) {
+      if (
+        venue?.floors?.length &&
+        next > this.floorIndex &&
+        next < venue.floors.length
+      ) {
         this.loadFloor(venue, next);
         return;
       }
@@ -650,22 +924,28 @@ export class Game {
     const alreadyCleared = key ? this.venuesCleared.includes(key) : true;
     const multiFloor = !!venue?.floors?.length;
     const clearedNow =
-      !alreadyCleared && !!key && !!venue &&
+      !alreadyCleared &&
+      !!key &&
+      !!venue &&
       (multiFloor
         ? this.visitKills >= this.visitTotal
         : this.enemies.length > 0 && this.enemies.every((e) => !e.alive));
     if (clearedNow && key && venue) {
       this.venuesCleared.push(key);
       const total = Object.keys(level.venues).length;
-      this.toast = this.venuesCleared.length >= total
-        ? multiFloor ? "All towers cleared! The Bull is awake." : "All venues cleared! The vault is open."
-        : `${venue.name} cleared. ${this.venuesCleared.length}/${total} ${multiFloor ? "towers" : "venues"}.`;
+      this.toast =
+        this.venuesCleared.length >= total
+          ? multiFloor
+            ? "All towers cleared! The Bull is awake."
+            : "All venues cleared! The vault is open."
+          : `${venue.name} cleared. ${this.venuesCleared.length}/${total} ${multiFloor ? "towers" : "venues"}.`;
       this.toastTime = 2.6;
     } else {
       this.toast = alreadyCleared
         ? "Back to the streets."
-        : multiFloor ? "Agents remain — the building resets."
-        : "Shills remain — come back to clear it.";
+        : multiFloor
+          ? "Agents remain — the building resets."
+          : "Shills remain — come back to clear it.";
       this.toastTime = 2.2;
     }
 
@@ -683,7 +963,8 @@ export class Game {
   }
 
   private owSolidAt(tx: number, ty: number): boolean {
-    if (tx < 0 || ty < 0 || tx >= this.ow.cols || ty >= this.ow.rows) return true;
+    if (tx < 0 || ty < 0 || tx >= this.ow.cols || ty >= this.ow.rows)
+      return true;
     const t = this.ow.grid[ty][tx];
     return t === "#" || t === "~" || t === "t";
   }
@@ -721,7 +1002,8 @@ export class Game {
       if (!taxi) continue;
       const span = Math.max(1, (route.to - route.from) * TILE);
       const cycle = span * 2;
-      const m = (((this.time * route.speed + route.phase) % cycle) + cycle) % cycle;
+      const m =
+        (((this.time * route.speed + route.phase) % cycle) + cycle) % cycle;
       const along = m < span ? m : cycle - m;
       taxi.dir = m < span ? 1 : -1;
       if (route.axis === "h") {
@@ -748,7 +1030,8 @@ export class Game {
     const cy = this.owPlayer.y + this.owPlayer.h / 2;
 
     for (const taxi of this.ow.taxis) {
-      if (this.owPlayer.invincible > 0 || !overlap(this.owPlayer, taxi)) continue;
+      if (this.owPlayer.invincible > 0 || !overlap(this.owPlayer, taxi))
+        continue;
       this.lives -= 1;
       this.deaths += 1;
       this.burst(cx, cy, 12);
@@ -808,7 +1091,11 @@ export class Game {
 
     const mapW = this.ow.cols * TILE;
     const mapH = this.ow.rows * TILE;
-    this.cameraX = clamp(cx - this.viewW / 2, 0, Math.max(0, mapW - this.viewW));
+    this.cameraX = clamp(
+      cx - this.viewW / 2,
+      0,
+      Math.max(0, mapW - this.viewW),
+    );
     this.cameraY = clamp(cy - VIEW_H / 2, 0, Math.max(0, mapH - VIEW_H));
   }
 
@@ -933,10 +1220,18 @@ export class Game {
       }
       if (enemy.type === "shitgun") {
         enemy.fireTimer -= dt;
-        const dx = (p.x + p.w / 2) - (enemy.x + enemy.w / 2);
-        if (enemy.fireTimer <= 0 && Math.abs(dx) < SHITGUN_RANGE && Math.abs(dx) > 18) {
+        const dx = p.x + p.w / 2 - (enemy.x + enemy.w / 2);
+        if (
+          enemy.fireTimer <= 0 &&
+          Math.abs(dx) < SHITGUN_RANGE &&
+          Math.abs(dx) > 18
+        ) {
           enemy.fireTimer = SHITGUN_PERIOD;
-          this.spawnShot(enemy.x + (dx > 0 ? enemy.w : -6), enemy.y + 5, Math.sign(dx) * SHITCOIN_SPEED);
+          this.spawnShot(
+            enemy.x + (dx > 0 ? enemy.w : -6),
+            enemy.y + 5,
+            Math.sign(dx) * SHITCOIN_SPEED,
+          );
         }
       } else {
         enemy.x += enemy.vx * dt;
@@ -1064,7 +1359,11 @@ export class Game {
     for (const page of this.pagesList) {
       if (!page.taken && overlap(p, page)) {
         page.taken = true;
-        if (this.subMode === "venue" && this.venueKey && !this.stashesTaken.includes(this.venueKey)) {
+        if (
+          this.subMode === "venue" &&
+          this.venueKey &&
+          !this.stashesTaken.includes(this.venueKey)
+        ) {
           this.stashesTaken.push(this.venueKey);
         }
         this.pages += 1;
@@ -1105,11 +1404,16 @@ export class Game {
       this.gameOver();
       return;
     }
-    this.burst(this.player.x + this.player.w * 0.5, this.player.y + this.player.h * 0.5, 14);
+    this.burst(
+      this.player.x + this.player.w * 0.5,
+      this.player.y + this.player.h * 0.5,
+      14,
+    );
     // Dying in a multi-floor building resets the visit, per its clear rule.
     if (this.subMode === "venue" && this.venueKey) {
       const level = this.currentLevel();
-      const venue = level.mode === "overworld" ? level.venues[this.venueKey] : undefined;
+      const venue =
+        level.mode === "overworld" ? level.venues[this.venueKey] : undefined;
       if (venue?.floors?.length) {
         const key = this.venueKey;
         this.enterVenue(key);
@@ -1153,7 +1457,12 @@ export class Game {
 
 function fallbackZone(): Zone {
   return {
-    x: 0, name: "", sky: "#101018", sky2: "#101018", ground: "#343b3b",
-    accent: "#f7931a", text: ""
+    x: 0,
+    name: "",
+    sky: "#101018",
+    sky2: "#101018",
+    ground: "#343b3b",
+    accent: "#f7931a",
+    text: "",
   };
 }
