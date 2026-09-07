@@ -1,3 +1,4 @@
+import { glyph } from "./pixel-font.ts";
 import { readFileSync } from "node:fs";
 import { inflateSync } from "node:zlib";
 import type { Screen } from "./screen.ts";
@@ -8,7 +9,7 @@ type Matrix = [number, number, number, number, number, number];
 const identity = (): Matrix => [1, 0, 0, 1, 0, 0];
 
 // The source artwork uses a small subset of Canvas 2D. Rasterize its original
-// paths directly at terminal resolution, keeping the package pure Node.js.
+// paths at either full image or terminal-cell resolution, using only Node.js.
 export class ArcadeCanvas {
   readonly canvas: { width: number; height: number };
   fillStyle = "#000000";
@@ -37,7 +38,11 @@ export class ArcadeCanvas {
     align: string;
   }> = [];
 
-  constructor(readonly fb: Fb) {
+  readonly fb: Fb;
+  readonly imageText: boolean;
+  constructor(fb: Fb, imageText = false) {
+    this.fb = fb;
+    this.imageText = imageText;
     this.canvas = { width: fb.w, height: fb.h };
   }
   save(): void {
@@ -239,6 +244,10 @@ export class ArcadeCanvas {
       }
   }
   fillText(value: string, x: number, y: number, maxWidth = Infinity): void {
+    if (this.imageText) {
+      this.drawImageText(value, x, y, maxWidth);
+      return;
+    }
     // Terminal glyphs retain the source signs and hit feedback at low resolution.
     // Remember their backdrop so later actors can still occlude the lettering.
     const [px, py] = this.point(x, y);
@@ -267,8 +276,42 @@ export class ArcadeCanvas {
       behind,
     });
   }
-  strokeText(_value: string, _x: number, _y: number): void {
-    /* Native text uses each cell's scene background. */
+  private drawImageText(
+    value: string,
+    x: number,
+    y: number,
+    maxWidth = Infinity,
+    outline = false,
+  ): void {
+    const height = Number(this.font.match(/[\d.]+/)?.[0] ?? 11);
+    const unit = Math.min(height / 7, maxWidth / Math.max(1, value.length * 6));
+    const width = value.length * 6 * unit;
+    const left =
+      x -
+      (this.textAlign === "center"
+        ? width / 2
+        : this.textAlign === "right"
+          ? width
+          : 0);
+    const previous = this.fillStyle;
+    if (outline) this.fillStyle = this.strokeStyle;
+    for (const [i, ch] of [...value].entries())
+      for (const [row, bits] of glyph(ch).entries())
+        for (let col = 0; col < 5; col++) {
+          if (bits & (1 << (4 - col))) {
+            const pad = outline ? this.lineWidth / 2 : 0;
+            this.fillRect(
+              left + i * 6 * unit + col * unit - pad,
+              y - 7 * unit + row * unit - pad,
+              unit + pad * 2,
+              unit + pad * 2,
+            );
+          }
+        }
+    this.fillStyle = previous;
+  }
+  strokeText(value: string, x: number, y: number): void {
+    if (this.imageText) this.drawImageText(value, x, y, Infinity, true);
   }
   blitLabels(screen: Screen, x: number, y: number): void {
     for (const label of this.labels) {

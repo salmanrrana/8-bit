@@ -1,7 +1,7 @@
 # 8-bit
 
-A retro platformer that runs in your terminal, with truecolor pixel
-graphics. Six levels, three lives, checkpoints.
+Six levels of Bitcoin arcade action, with a detailed city brawler and classic
+terminal platforming. Three lives, checkpoints, four brawler fighters.
 
 ## Play
 
@@ -9,8 +9,21 @@ graphics. Six levels, three lives, checkpoints.
 npx eightbit
 ```
 
-Needs Node.js 18+ and a real TTY. Looks best in a truecolor terminal
-(Ghostty, Kitty, iTerm, WezTerm, Windows Terminal).
+Needs Node.js 18+. Level 6 renders its city and fighters at **960 × 540**, with
+a separate HUD, using full-color images in terminals that support the
+[Kitty graphics protocol](https://sw.kovidgoyal.net/kitty/graphics-protocol/).
+The game checks actual support, including inside multiplexers such as Herdr.
+If images cannot get through, it opens a local HD game window automatically.
+Levels 1–5 keep their classic terminal appearance.
+
+```bash
+npx eightbit --window # open the local HD viewer directly, with Level 6 selected
+npx eightbit --text   # keep all play inside the terminal using text pixels
+```
+
+The window runs entirely on your computer; keep its terminal open and press
+Ctrl+C there to stop it. Use `--no-open` to print its local URL without launching
+a browser. A real TTY is required unless using `--window`.
 
 Building from source and running the TypeScript tests requires Node.js 22.18+
 (or newer) because the development suite executes `.ts` files directly.
@@ -19,6 +32,7 @@ Building from source and running the TypeScript tests requires Node.js 22.18+
 npm install
 npm run check:fast # lint, strict types, and game tests
 npm run build
+npm start -- --window # play this checkout locally; no publishing needed
 ```
 
 `npm install` configures an executable pre-commit hook. It checks an isolated
@@ -56,6 +70,14 @@ districts and sixteen waves to break the Bullshit Machine.
   save progress. Losing all health costs one life; losing three ends the run.
 
 This adapts the original `8bit-satoshi` level's city artwork, fighters, objects,
-and combat to truecolor terminal pixels. Use at least **80 columns × 24 rows**;
-**160 × 48 or larger** shows more detail. Signs and instructions use readable
-terminal text. Set `EIGHTBIT_REDUCED_MOTION=1` to disable screen shake.
+and combat. Full-resolution rendering preserves the city detail independently
+of your terminal font size. The window supports fullscreen and pauses when it
+loses focus. With `--text`, use at least **80 columns × 24 rows**; **160 × 48**
+or larger shows more detail. Set `EIGHTBIT_REDUCED_MOTION=1` to disable screen
+shake.
+
+## Publishing
+
+After signing in with `npm login --registry=https://registry.npmjs.org/`, run
+`npm publish --access public`. The publish hook runs tests and builds the
+package first. Each published release needs a new version in `package.json`.

@@ -122,6 +122,12 @@ export class Screen {
     this.fg[i] = pack(fg);
   }
 
+  /** Force repaint after an image layer covered the terminal cells. */
+  invalidate(): void {
+    this.prevCh.fill("");
+    this.first = true;
+  }
+
   /** Diff against the last flush and write only changed runs. */
   flush(out: NodeJS.WriteStream): void {
     const { cols, rows } = this;
